@@ -223,7 +223,15 @@ public class TelegramWorkerTests
         Assert.Equal(1, failures[0].AttemptCount);
         Assert.NotNull(failures[0].NextAttemptAt); // scheduled per backoff policy
 
-        // Simulate backoff elapsed: claim again directly (FAILED → SENDING).
+        // Simulate backoff elapsed before claiming again (FAILED → SENDING).
+        await using (var conn = new Npgsql.NpgsqlConnection(_db.ConnectionString))
+        {
+            await conn.OpenAsync();
+            await using var cmd = new Npgsql.NpgsqlCommand(
+                "UPDATE notification_deliveries SET next_attempt_at = now() WHERE id = @id", conn);
+            cmd.Parameters.AddWithValue("@id", failures[0].Id);
+            await cmd.ExecuteNonQueryAsync();
+        }
         var claimed = await deliveries.ClaimForSendAsync();
         Assert.NotNull(claimed);
         Assert.Equal(2, claimed!.AttemptCount);
@@ -295,7 +303,7 @@ public class TelegramWorkerTests
         var claimed = await deliveries.ClaimForSendAsync();
         Assert.NotNull(claimed);
 
-        await deliveries.MarkFailedAsync(claimed!.Id, "timeout", retryable: true);
+        await deliveries.MarkFailedAsync(claimed!.Id, "timeout", retryable: true, backoffBaseSeconds: 0);
         var row = Assert.Single(await deliveries.RetryableFailuresAsync());
         Assert.Equal(DeliveryStatus.FAILED, row.Status);
 

@@ -117,7 +117,9 @@ internal static class MatchScoring
         var budget = Budget(opp, profile);
         var type = TypeFit(opp, profile);
         var location = Location(opp, profile);
-        var urgency = Urgency(opp);
+        if (double.IsNaN(semantic) || double.IsInfinity(semantic) || semantic < 0 || semantic > 100)
+            throw new ArgumentOutOfRangeException(nameof(semantic), semantic, "semantic score must be finite and between 0 and 100");
+        var urgency = Urgency(opp, snapshot.CapturedAt);
         var semanticNorm = Math.Clamp(semantic / 100.0, 0.0, 1.0);
 
         var raw = 100.0 * (
@@ -255,10 +257,10 @@ internal static class MatchScoring
         return 0.0;
     }
 
-    private static double Urgency(Opportunity opp)
+    private static double Urgency(Opportunity opp, DateTimeOffset capturedAt)
     {
         if (opp.Deadline is null) return 0.5;
-        var days = (opp.Deadline.Value - DateTimeOffset.UtcNow).TotalDays;
+        var days = (opp.Deadline.Value - capturedAt).TotalDays;
         if (days < 0) return 0.0;
         if (days <= 7) return 1.0;
         if (days <= 30) return 0.8;

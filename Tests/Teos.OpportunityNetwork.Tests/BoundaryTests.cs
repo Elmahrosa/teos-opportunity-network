@@ -104,7 +104,7 @@ public class BoundaryTests
     [Fact]
     public void No_source_file_hardcodes_secrets()
     {
-        string[] roots = { FindSourceDir("src"), FindSourceDir("tests"), FindSourceDir("migrations") };
+        string[] roots = { FindSourceDir("src"), FindSourceDir("Tests"), FindSourceDir("migrations") };
         string[] patterns = { "TELEGRAM_BOT_TOKEN=", "GITHUB_TOKEN=", "OPENAI_API_KEY=", "sk-proj-", "ghp_" };
 
         foreach (var root in roots.Where(Directory.Exists))

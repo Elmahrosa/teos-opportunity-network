@@ -69,7 +69,11 @@ public sealed class TelegramWorker
 
             // Reuse/create the delivery row, then claim it atomically (PENDING/FAILED → SENDING).
             var deliveryId = await _deliveries.CreateDeliveryAsync(alert.MatchId, alert.UserId, NotificationRepository.TelegramChannel, ct).ConfigureAwait(false);
-            var claimed = await _deliveries.ClaimForSendAsync(_options.MaxAttempts, channel: NotificationRepository.TelegramChannel, ct: ct).ConfigureAwait(false);
+            var claimed = await _deliveries.ClaimForSendAsync(
+                _options.MaxAttempts,
+                channel: NotificationRepository.TelegramChannel,
+                ct: ct,
+                deliveryId: deliveryId).ConfigureAwait(false);
             if (claimed is null) continue;
 
             // Format from persisted data only — never computes a score.
@@ -115,8 +119,6 @@ public sealed class TelegramWorker
             {
                 await _deliveries.MarkFailedAsync(claimed.Id, Sanitize(ex.Message), retryable: false, ct: ct).ConfigureAwait(false);
             }
-
-            _ = deliveryId;
         }
 
         return sent;

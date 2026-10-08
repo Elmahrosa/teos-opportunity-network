@@ -267,8 +267,9 @@ public sealed class MatchRepository
     {
         await using var cmd = new NpgsqlCommand(@"
             SELECT id, opportunity_id, user_id, match_score, decision, recommended_action,
-                   matched_skills, missing_skills, semantic_score, confidence, scoring_config,
-                   weights_version, engine_version, snapshot_source_id, created_at
+                   skill_match, experience_match, budget_match, location_match, urgency_score,
+                   semantic_score, confidence, matched_skills, missing_skills, reasons, warnings,
+                   scoring_config, weights_version, engine_version, snapshot_source_id, created_at
             FROM opportunity_matches
             WHERE opportunity_id = @o AND user_id = @u
               AND weights_version = @w AND engine_version = @e", conn, tx);
@@ -284,30 +285,31 @@ public sealed class MatchRepository
 
     private static MatchResult ReadMatch(NpgsqlDataReader reader)
     {
-        var scoringJson = reader.GetFieldValue<string>(10);
-        var config = ScoringConfig.FromJson(scoringJson);
-        var score = reader.GetDouble(3);
+        var scoringJson = reader.GetFieldValue<string>(17);
         return new MatchResult
         {
             Id = reader.GetGuid(0),
             OpportunityId = reader.GetGuid(1),
             UserId = reader.GetGuid(2),
-            MatchScore = score,
+            MatchScore = reader.GetDouble(3),
             Decision = Enum.Parse<MatchDecision>(reader.GetString(4)),
             RecommendedAction = Enum.Parse<RecommendedAction>(reader.GetString(5)),
-            MatchedSkills = reader.GetFieldValue<string[]>(6),
-            MissingSkills = reader.GetFieldValue<string[]>(7),
-            SemanticScore = reader.GetDouble(8),
-            Confidence = reader.GetDouble(9),
+            SkillMatch = reader.GetDouble(6),
+            ExperienceMatch = reader.GetDouble(7),
+            BudgetMatch = reader.GetDouble(8),
+            LocationMatch = reader.GetDouble(9),
+            UrgencyScore = reader.GetDouble(10),
+            SemanticScore = reader.GetDouble(11),
+            Confidence = reader.GetDouble(12),
+            MatchedSkills = reader.GetFieldValue<string[]>(13),
+            MissingSkills = reader.GetFieldValue<string[]>(14),
+            Reasons = JsonSerializer.Deserialize<string[]>(reader.GetFieldValue<string>(15)) ?? Array.Empty<string>(),
+            Warnings = JsonSerializer.Deserialize<string[]>(reader.GetFieldValue<string>(16)) ?? Array.Empty<string>(),
             ScoringConfig = scoringJson,
-            WeightsVersion = reader.GetString(11),
-            EngineVersion = reader.GetString(12),
-            SnapshotSourceId = reader.GetGuid(13),
-            CreatedAt = reader.GetFieldValue<DateTimeOffset>(14),
-            // component scores are intentionally not re-derived: they live in the row for evidence
-            SkillMatch = config.Weights.TryGetValue("skills", out _) ? score / 100 : 0,
-            Reasons = Array.Empty<string>(),
-            Warnings = Array.Empty<string>()
+            WeightsVersion = reader.GetString(18),
+            EngineVersion = reader.GetString(19),
+            SnapshotSourceId = reader.GetGuid(20),
+            CreatedAt = reader.GetFieldValue<DateTimeOffset>(21)
         };
     }
 

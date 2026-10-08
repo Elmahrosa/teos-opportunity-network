@@ -5,8 +5,10 @@
 -- Decision/action threshold invariants are enforced here as CHECK constraints so an invalid
 -- row can never be persisted, regardless of caller:
 --   score >= 85 -> ALERT   |  >= 60 -> LOG        |  < 60 -> IGNORE
---   score >= 90 -> APPLY_NOW | >= 75 -> REVIEW     |  < 75 -> PASS
+--   score >= 90 -> APPLY_NOW | >= 75 -> REVIEW     | < 75 -> PASS
 --   score >= 90 can NEVER be IGNORE or PASS.
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS opportunities (
     id               uuid PRIMARY KEY,

@@ -105,7 +105,8 @@ public sealed class NotificationRepository
         int maxAttempts = 5,
         DateTimeOffset? staleSendingCutoff = null,
         string channel = TelegramChannel,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Guid? deliveryId = null)
     {
         var cutoff = staleSendingCutoff ?? DateTimeOffset.UtcNow.AddMinutes(-5);
         await using var conn = new NpgsqlConnection(_conn);
@@ -118,9 +119,11 @@ public sealed class NotificationRepository
     WHERE id = (
         SELECT id FROM notification_deliveries
         WHERE channel = @c
+          AND (@id IS NULL OR id = @id)
           AND (
                 (status = 'PENDING')
-                OR (status = 'FAILED' AND attempt_count < @max)
+                OR (status = 'FAILED' AND attempt_count < @max
+                    AND (next_attempt_at IS NULL OR next_attempt_at <= now()))
                 OR (status = 'SENDING' AND updated_at < @stale)
               )
         ORDER BY created_at
@@ -132,6 +135,7 @@ public sealed class NotificationRepository
         cmd.Parameters.AddWithValue("@c", channel);
         cmd.Parameters.AddWithValue("@max", maxAttempts);
         cmd.Parameters.AddWithValue("@stale", cutoff);
+        cmd.Parameters.AddWithValue("@id", (object?)deliveryId ?? DBNull.Value);
 
         await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
         if (!await reader.ReadAsync(ct).ConfigureAwait(false))

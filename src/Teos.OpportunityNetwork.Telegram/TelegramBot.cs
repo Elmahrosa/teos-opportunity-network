@@ -53,25 +53,39 @@ public sealed class TelegramBot
         if (userId is null) return; // cannot link without an authenticated user mapping
         await using var conn = new NpgsqlConnection(_conn);
         await conn.OpenAsync(ct).ConfigureAwait(false);
+        await using var tx = await conn.BeginTransactionAsync(ct).ConfigureAwait(false);
         await using var cmd = new NpgsqlCommand(@"
             INSERT INTO telegram_chats (user_id, chat_id, paused, created_at, updated_at)
             VALUES (@u, @c, FALSE, now(), now())
             ON CONFLICT (user_id) DO UPDATE SET chat_id = EXCLUDED.chat_id, paused = FALSE, updated_at = now()",
-            conn);
+            conn, tx);
         cmd.Parameters.AddWithValue("@u", userId.Value);
         cmd.Parameters.AddWithValue("@c", chatId.ToString());
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        await using var resume = new NpgsqlCommand(
+            "UPDATE user_profiles SET notifications_paused = FALSE, updated_at = now() WHERE id = @u", conn, tx);
+        resume.Parameters.AddWithValue("@u", userId.Value);
+        await resume.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        await tx.CommitAsync(ct).ConfigureAwait(false);
     }
 
     private async Task SetPausedAsync(long chatId, bool paused, CancellationToken ct)
     {
         await using var conn = new NpgsqlConnection(_conn);
         await conn.OpenAsync(ct).ConfigureAwait(false);
+        await using var tx = await conn.BeginTransactionAsync(ct).ConfigureAwait(false);
         await using var cmd = new NpgsqlCommand(
-            "UPDATE telegram_chats SET paused = @p, updated_at = now() WHERE chat_id = @c", conn);
+            "UPDATE telegram_chats SET paused = @p, updated_at = now() WHERE chat_id = @c", conn, tx);
         cmd.Parameters.AddWithValue("@p", paused);
         cmd.Parameters.AddWithValue("@c", chatId.ToString());
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        await using var profile = new NpgsqlCommand(@"
+            UPDATE user_profiles SET notifications_paused = @p, updated_at = now()
+            WHERE id IN (SELECT user_id FROM telegram_chats WHERE chat_id = @c)", conn, tx);
+        profile.Parameters.AddWithValue("@p", paused);
+        profile.Parameters.AddWithValue("@c", chatId.ToString());
+        await profile.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        await tx.CommitAsync(ct).ConfigureAwait(false);
     }
 
     /// <summary>Resolves the Telegram chat id for a user (throws when unregistered).</summary>

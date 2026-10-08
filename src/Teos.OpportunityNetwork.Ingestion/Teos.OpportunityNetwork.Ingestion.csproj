@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Teos.OpportunityNetwork.Ingestion</RootNamespace>
+    <AssemblyName>Teos.OpportunityNetwork.Ingestion</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Teos.OpportunityNetwork.Core\Teos.OpportunityNetwork.Core.csproj" />
+  </ItemGroup>
+</Project>

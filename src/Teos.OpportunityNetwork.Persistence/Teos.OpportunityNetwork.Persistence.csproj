@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Teos.OpportunityNetwork.Persistence</RootNamespace>
+    <AssemblyName>Teos.OpportunityNetwork.Persistence</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="8.0.5" />
+    <ProjectReference Include="..\Teos.OpportunityNetwork.Core\Teos.OpportunityNetwork.Core.csproj" />
+  </ItemGroup>
+</Project>

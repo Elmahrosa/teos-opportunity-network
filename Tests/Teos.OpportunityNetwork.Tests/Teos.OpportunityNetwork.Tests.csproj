@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Teos.OpportunityNetwork.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="Npgsql" Version="8.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Teos.OpportunityNetwork.Core\Teos.OpportunityNetwork.Core.csproj" />
+    <ProjectReference Include="..\..\src\Teos.OpportunityNetwork.Ingestion\Teos.OpportunityNetwork.Ingestion.csproj" />
+    <ProjectReference Include="..\..\src\Teos.OpportunityNetwork.Matching\Teos.OpportunityNetwork.Matching.csproj" />
+    <ProjectReference Include="..\..\src\Teos.OpportunityNetwork.Persistence\Teos.OpportunityNetwork.Persistence.csproj" />
+    <ProjectReference Include="..\..\src\Teos.OpportunityNetwork.Telegram\Teos.OpportunityNetwork.Telegram.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Teos.OpportunityNetwork.Telegram</RootNamespace>
+    <AssemblyName>Teos.OpportunityNetwork.Telegram</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Teos.OpportunityNetwork.Core\Teos.OpportunityNetwork.Core.csproj" />
+    <ProjectReference Include="..\Teos.OpportunityNetwork.Persistence\Teos.OpportunityNetwork.Persistence.csproj" />
+  </ItemGroup>
+</Project>

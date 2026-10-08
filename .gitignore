@@ -1,0 +1,36 @@
+# build output
+bin/
+obj/
+out/
+*.dll
+*.pdb
+*.exe
+
+# IDE
+.vs/
+.idea/
+*.user
+*.suo
+
+# environment / secrets
+.env
+*.env
+!.env.example
+
+# local databases
+*.sqlite
+*.sqlite3
+*.db
+*.postgres
+pgdata/
+
+# test / temp artifacts
+TestResults/
+*.trx
+*.log
+tmp/
+temp/
+
+# OS
+Thumbs.db
+.DS_Store

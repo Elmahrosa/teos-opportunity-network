@@ -223,8 +223,8 @@ public sealed class NotificationRepository
     /// <summary>
     /// FAILED rows that are still retry-eligible: a retry was scheduled (next_attempt_at is set)
     /// and the attempt budget is not exhausted. Terminal rows (non-retryable, or attempts
-    /// exhausted) have next_attempt_at NULL and are excluded. The backoff timestamp is advisory;
-    /// ClaimForSendAsync is the authoritative gate.
+    /// exhausted) have next_attempt_at NULL and are excluded. ClaimForSendAsync also enforces
+    /// that the scheduled next_attempt_at has been reached.
     /// </summary>
     public async Task<IReadOnlyList<NotificationDelivery>> RetryableFailuresAsync(int maxAttempts = 5, CancellationToken ct = default)
     {

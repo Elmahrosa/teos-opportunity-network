@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Teos.OpportunityNetwork.Runner</RootNamespace>
+    <AssemblyName>Teos.OpportunityNetwork.Runner</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Teos.OpportunityNetwork.Core\Teos.OpportunityNetwork.Core.csproj" />
+    <ProjectReference Include="..\Teos.OpportunityNetwork.Ingestion\Teos.OpportunityNetwork.Ingestion.csproj" />
+    <ProjectReference Include="..\Teos.OpportunityNetwork.Matching\Teos.OpportunityNetwork.Matching.csproj" />
+    <ProjectReference Include="..\Teos.OpportunityNetwork.Persistence\Teos.OpportunityNetwork.Persistence.csproj" />
+    <ProjectReference Include="..\Teos.OpportunityNetwork.Telegram\Teos.OpportunityNetwork.Telegram.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="5.0.0" />
+    <PackageReference Include="Serilog.Formatting.Compact" Version="2.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Teos.OpportunityNetwork.Collectors\Teos.OpportunityNetwork.Collectors.csproj" />
+    <ProjectReference Include="..\Teos.OpportunityNetwork.Valuation\Teos.OpportunityNetwork.Valuation.csproj" />
+  </ItemGroup>
+</Project>

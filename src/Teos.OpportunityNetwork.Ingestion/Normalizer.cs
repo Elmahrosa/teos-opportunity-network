@@ -3,6 +3,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Teos.OpportunityNetwork.Core.Domain;
+using Teos.OpportunityNetwork.Core;
+using Teos.OpportunityNetwork.Valuation;
 
 namespace Teos.OpportunityNetwork.Ingestion;
 
@@ -193,6 +195,68 @@ public static partial class Normalizer
             Deadline = NormalizeDate(raw.Deadline),
             Status = "OPEN",
             ContentHash = ComputeContentHash(title, company, url, type),
+            FirstSeenAt = utcNow,
+            LastSeenAt = utcNow
+        };
+    }
+
+    /// <summary>
+    /// Normalizes a GitHub repository raw data into an Opportunity using a pre-computed valuation.
+    /// Intended for raw.Source == "github_repo".
+    /// </summary>
+    public static Opportunity NormalizeRepo(RawRepoData raw, RepoValuationResult valuation, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(raw);
+        ArgumentNullException.ThrowIfNull(valuation);
+
+        var utcNow = now.ToUniversalTime();
+
+        // Extract owner from ExternalId (expected format: "owner/repo")
+        var owner = "";
+        if (!string.IsNullOrEmpty(raw.ExternalId))
+        {
+            var parts = raw.ExternalId.Split('/');
+            if (parts.Length >= 2)
+                owner = parts[0];
+        }
+
+        var title = NormalizeTitle(raw.Name);
+        var url = NormalizeUrl(raw.Url);
+        var description = raw.Description;
+
+        // Compute content hash as SHA256 of Url+UpdatedAt.ToString("O")
+        string contentHash;
+        if (!string.IsNullOrEmpty(raw.Url))
+        {
+            var hashInput = raw.Url + raw.UpdatedAt.ToString("O");
+            var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(hashInput));
+            contentHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
+        }
+        else
+        {
+            contentHash = string.Empty;
+        }
+
+        return new Opportunity
+        {
+            Id = Guid.NewGuid(),
+            Source = raw.Source.Trim().ToLowerInvariant(),
+            ExternalId = raw.ExternalId.Trim(),
+            Title = title,
+            Company = string.IsNullOrWhiteSpace(owner) ? null : owner.Trim(),
+            Url = url,
+            Description = description,
+            Location = null, // not applicable for repo
+            OpportunityType = OpportunityType.SOFTWARE,
+            SkillsRequired = raw.Languages.Keys.ToArray(),
+            BudgetMin = (decimal)valuation.EstimatedLow,
+            BudgetMax = (decimal)valuation.EstimatedHigh,
+            Currency = "USD", // valuation is in USD
+            BudgetType = "valuation",
+            PostedAt = null, // not applicable
+            Deadline = null, // not applicable
+            Status = "OPEN",
+            ContentHash = contentHash,
             FirstSeenAt = utcNow,
             LastSeenAt = utcNow
         };

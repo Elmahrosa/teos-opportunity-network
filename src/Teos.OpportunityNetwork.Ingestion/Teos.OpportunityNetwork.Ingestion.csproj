@@ -8,5 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Teos.OpportunityNetwork.Core\Teos.OpportunityNetwork.Core.csproj" />
+    <ProjectReference Include="..\Teos.OpportunityNetwork.Valuation\Teos.OpportunityNetwork.Valuation.csproj" />
   </ItemGroup>
 </Project>

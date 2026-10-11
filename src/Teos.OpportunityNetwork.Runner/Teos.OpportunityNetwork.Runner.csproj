@@ -20,6 +20,10 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="5.0.0" />
-    <PackageReference Include="Serilog.Formatting.Json" Version="8.0.0" />
+    <PackageReference Include="Serilog.Formatting.Compact" Version="2.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Teos.OpportunityNetwork.Collectors\Teos.OpportunityNetwork.Collectors.csproj" />
+    <ProjectReference Include="..\Teos.OpportunityNetwork.Valuation\Teos.OpportunityNetwork.Valuation.csproj" />
   </ItemGroup>
 </Project>

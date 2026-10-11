@@ -1,4 +1,3 @@
-﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -14,6 +13,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Teos.OpportunityNetwork.Persistence", "src\Teos.OpportunityNetwork.Persistence\Teos.OpportunityNetwork.Persistence.csproj", "{D016EE66-996A-4386-8DDC-AA6CEAD40A6F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Teos.OpportunityNetwork.Telegram", "src\Teos.OpportunityNetwork.Telegram\Teos.OpportunityNetwork.Telegram.csproj", "{A3CBC70F-AEAD-454E-AAC3-2C9BDA26743D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Teos.OpportunityNetwork.Collectors", "src\Teos.OpportunityNetwork.Collectors\Teos.OpportunityNetwork.Collectors.csproj", "{8B1C9A2E-3D4F-5A6B-7C8D-9E0F1A2B3C4D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Teos.OpportunityNetwork.Valuation", "src\Teos.OpportunityNetwork.Valuation\Teos.OpportunityNetwork.Valuation.csproj", "{9C2D3E4F-5A6B-7C8D-9E0F1A2B3C4D-5E6F}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{2EB461DA-7E16-4B79-AA4F-9FB147D6040C}"
 EndProject
@@ -48,6 +51,14 @@ Global
 		{A3CBC70F-AEAD-454E-AAC3-2C9BDA26743D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A3CBC70F-AEAD-454E-AAC3-2C9BDA26743D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A3CBC70F-AEAD-454E-AAC3-2C9BDA26743D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8B1C9A2E-3D4F-5A6B-7C8D-9E0F1A2B3C4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8B1C9A2E-3D4F-5A6B-7C8D-9E0F1A2B3C4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8B1C9A2E-3D4F-5A6B-7C8D-9E0F1A2B3C4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8B1C9A2E-3D4F-5A6B-7C8D-9E0F1A2B3C4D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9C2D3E4F-5A6B-7C8D-9E0F1A2B3C4D-5E6F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9C2D3E4F-5A6B-7C8D-9E0F1A2B3C4D-5E6F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9C2D3E4F-5A6B-7C8D-9E0F1A2B3C4D-5E6F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9C2D3E4F-5A6B-7C8D-9E0F1A2B3C4D-5E6F}.Release|Any CPU.Build.0 = Release|Any CPU
 		{F34B8A4E-E2CC-477D-ACFE-E1823094F210}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{F34B8A4E-E2CC-477D-ACFE-E1823094F210}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F34B8A4E-E2CC-477D-ACFE-E1823094F210}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -59,6 +70,8 @@ Global
 		{31C4B724-18AD-4B21-A124-AAD61ADB2EEE} = {086A1D07-78AA-4516-A52B-3F1A442EC750}
 		{D016EE66-996A-4386-8DDC-AA6CEAD40A6F} = {086A1D07-78AA-4516-A52B-3F1A442EC750}
 		{A3CBC70F-AEAD-454E-AAC3-2C9BDA26743D} = {086A1D07-78AA-4516-A52B-3F1A442EC750}
+		{8B1C9A2E-3D4F-5A6B-7C8D-9E0F1A2B3C4D} = {086A1D07-78AA-4516-A52B-3F1A442EC750}
+		{9C2D3E4F-5A6B-7C8D-9E0F1A2B3C4D-5E6F} = {086A1D07-78AA-4516-A52B-3F1A442EC750}
 		{F34B8A4E-E2CC-477D-ACFE-E1823094F210} = {2EB461DA-7E16-4B79-AA4F-9FB147D6040C}
 	EndGlobalSection
 EndGlobal

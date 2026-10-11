@@ -14,29 +14,72 @@ inputs:
     description: 'Report tier: basic (free) or gold ($25)'
     required: false
     default: 'basic'
+  github-token:
+    description: 'GitHub token for API (uses github.token by default)'
+    required: false
+    default: ${{ github.token }}
 
 outputs:
   score:
     description: 'TEOS Score 0-100'
+    value: ${{ steps.valuation.outputs.score }}
   value-low:
     description: 'Low $ valuation'
+    value: ${{ steps.valuation.outputs.value-low }}
   value-high:
     description: 'High $ valuation'
+    value: ${{ steps.valuation.outputs.value-high }}
   decision:
     description: 'ALERT / LOG / IGNORE'
+    value: ${{ steps.valuation.outputs.decision }}
 
 runs:
   using: 'composite'
   steps:
-    - name: Run TEOS Valuation
+    - id: valuation
       shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        TEOS_GITHUB_TOKEN: ${{ inputs.github-token }}
       run: |
-        echo "=== TEOS Repo Valuation ==="
-        echo "Repo: ${{ inputs.repo-url }}"
-        # Run the TEOS valuation engine
-        dotnet run --project src/Teos.OpportunityNetwork.Runner/Teos.OpportunityNetwork.Runner.csproj -- smoke || echo "Mock: Score=88/100 | $3200-$7500 | ALERT"
+        set -euo pipefail
+        REPO_URL="${{ inputs.repo-url }}"
+        TIER="${{ inputs.tier }}"
+        PROJECT="src/Teos.OpportunityNetwork.Runner/Teos.OpportunityNetwork.Runner.csproj"
 
-        echo "score=88" >> $GITHUB_OUTPUT
-        echo "value-low=3200" >> $GITHUB_OUTPUT
-        echo "value-high=7500" >> $GITHUB_OUTPUT
-        echo "decision=ALERT" >> $GITHUB_OUTPUT
+        echo "=== TEOS Repo Valuation (LIVE) ==="
+        echo "Repo: $REPO_URL"
+        echo "Tier: $TIER"
+
+        # Temp file for structured result
+        RESULT_FILE=$(mktemp)
+        trap "rm -f $RESULT_FILE" EXIT
+
+        // Call the real engine - no --smoke flag
+        // Runner must support: --repo-url, --tier, --output-json <file>
+        // It should write JSON: {"score":88,"value_low":3200,"value_high":7500,"decision":"ALERT"}
+        if ! dotnet run --project "$PROJECT" -- --repo-url "$REPO_URL" --tier "$TIER" --output-json "$RESULT_FILE"; then
+          echo "::error::TEOS valuation failed"
+          cat "$RESULT_FILE" || true
+          exit 1
+        fi
+
+        echo "--- Raw result ---"
+        cat "$RESULT_FILE"
+
+        // Parse JSON without external deps (python is always available on GH runners)
+        SCORE=$(python3 -c "import json; print(json.load(open('$RESULT_FILE')).get('score',0))")
+        LOW=$(python3 -c "import json; print(json.load(open('$RESULT_FILE')).get('value_low',0))"
+        HIGH=$(python3 -c "import json; print(json.load(open('$RESULT_FILE')).get('value_high',0))"
+        DECISION=$(python3 -c "import json; print(json.load(open('$RESULT_FILE')).get('decision','IGNORE'))"
+
+        // Export to GITHUB_OUTPUT for composite outputs
+        echo "score=$SCORE" >> $GITHUB_OUTPUT
+        echo "value-low=$LOW" >> $GITHUB_OUTPUT
+        echo "value-high=$HIGH" >> $GITHUB_OUTPUT
+        echo "decision=$DECISION" >> $GITHUB_OUTPUT
+
+        echo "### TEOS Valuation Result" >> $GITHUB_STEP_SUMMARY
+        echo "- **Score:** $SCORE/100" >> $GITHUB_STEP_SUMMARY
+        echo "- **Value:** \$$LOW - \$$HIGH" >> $GITHUB_STEP_SUMMARY
+        echo "- **Decision:** $DECISION" >> $GITHUB_STEP_SUMMARY

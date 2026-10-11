@@ -1,0 +1,27 @@
+name: 'TEOS Sovereign Repo Valuation'
+description: 'Value your GitHub repo as asset - Score 0-100 + dollar estimation. Deterministic, no LLM.'
+author: 'Elmahrosa'
+branding:
+  icon: 'dollar-sign'
+  color: 'green'
+inputs:
+  github-token:
+    description: 'GITHUB_TOKEN'
+    required: false
+    default: ${{ github.token }}
+outputs:
+  score:
+    description: 'TEOS Score 0-100'
+  valuation:
+    description: 'Estimated range'
+  decision:
+    description: 'ALERT/LOG/IGNORE'
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+    - name: Run TEOS Valuation
+      shell: bash
+      run: dotnet run --project src/Teos.OpportunityNetwork.Runner/Teos.OpportunityNetwork.Runner.csproj -- smoke

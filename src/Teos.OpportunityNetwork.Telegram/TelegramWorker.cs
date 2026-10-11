@@ -1,33 +1,24 @@
 using Teos.OpportunityNetwork.Core.Domain;
 using Teos.OpportunityNetwork.Persistence;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 
 namespace Teos.OpportunityNetwork.Telegram;
 
 /// <summary>
 /// Step 9 worker: pending_alerts() → claim → format → send → mark_sent/mark_failed.
-///
-/// Boundary guarantees (enforced by boundary tests):
-///   - No matching, scoring, LLM, dedup, weights, or benchmark code is referenced.
-///   - Reads persisted MatchResult data only via MatchRepository.PendingAlertsAsync.
-///   - Never mutates opportunity_matches.
-///
-/// Delivery guarantee: at most one SENT record per (match, user, channel) — enforced by
-/// the partial unique index + already_alerted double-check. Telegram itself cannot
-/// guarantee exactly-once: a crash after the API accepts the message but before mark_sent
-/// can produce one duplicate on retry. Application-level delivery is idempotent; this
-/// system does not claim exactly-once.
 /// </summary>
-public sealed class TelegramWorker
+public sealed class TelegramWorker : IHostedService
 {
-    public sealed record Options(int MaxAttempts = 5);
-
     private readonly MatchRepository _matches;
     private readonly NotificationRepository _deliveries;
     private readonly ITelegramClient _client;
     private readonly Func<Guid, string> _resolveChatId;
     private readonly Options _options;
+    private Timer _timer;
+    private readonly TimeSpan _interval = TimeSpan.FromSeconds(30); // run every 30 seconds
 
-    /// <param name="resolveChatId">Maps user id → Telegram chat id (persisted chat identity lookup).</param>
     public TelegramWorker(
         MatchRepository matches,
         NotificationRepository deliveries,
@@ -40,6 +31,18 @@ public sealed class TelegramWorker
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _resolveChatId = resolveChatId ?? throw new ArgumentNullException(nameof(resolveChatId));
         _options = options ?? new Options();
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        _timer = new Timer(async _ => await RunOnceAsync(cancellationToken), null, TimeSpan.Zero, _interval);
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        _timer?.Change(Timeout.Infinite, 0);
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -123,6 +126,8 @@ public sealed class TelegramWorker
 
         return sent;
     }
+
+    public sealed record Options(int MaxAttempts = 5);
 
     private static string Sanitize(string error) => TelegramBotClient.Redact(error);
 }

@@ -10,4 +10,7 @@
     <ProjectReference Include="..\Teos.OpportunityNetwork.Core\Teos.OpportunityNetwork.Core.csproj" />
     <ProjectReference Include="..\Teos.OpportunityNetwork.Persistence\Teos.OpportunityNetwork.Persistence.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+  </ItemGroup>
 </Project>

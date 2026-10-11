@@ -21,4 +21,18 @@ public sealed class RawRepoData
     public string? Language { get; set; }
     public Dictionary<string, int> Languages { get; set; } = new();
     public string? License { get; set; }
+
+    private string _fullName = "";
+    public string FullName
+    {
+        get => _fullName;
+        set => _fullName = value;
+    }
+
+    private int _languageCount = 0;
+    public int LanguageCount
+    {
+        get => _languageCount;
+        set => _languageCount = value;
+    }
 }

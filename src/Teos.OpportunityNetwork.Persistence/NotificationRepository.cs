@@ -135,7 +135,7 @@ public sealed class NotificationRepository
         cmd.Parameters.AddWithValue("@c", channel);
         cmd.Parameters.AddWithValue("@max", maxAttempts);
         cmd.Parameters.AddWithValue("@stale", cutoff);
-        cmd.Parameters.AddWithValue("@id", (object?)deliveryId ?? DBNull.Value);
+        cmd.Parameters.Add(new NpgsqlParameter("@id", NpgsqlTypes.NpgsqlDbType.Uuid) { Value = (object?)deliveryId ?? DBNull.Value });
 
         await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
         if (!await reader.ReadAsync(ct).ConfigureAwait(false))
@@ -201,7 +201,7 @@ public sealed class NotificationRepository
             SET status = 'FAILED', last_error = @e, next_attempt_at = @next, updated_at = now()
             WHERE id = @id AND status <> 'SENT'", conn);
         cmd.Parameters.AddWithValue("@e", Truncate(sanitizedError, 2000));
-        cmd.Parameters.AddWithValue("@next", (object?)nextAttempt ?? DBNull.Value);
+        cmd.Parameters.Add(new NpgsqlParameter("@next", NpgsqlTypes.NpgsqlDbType.TimestampTz) { Value = (object?)nextAttempt ?? DBNull.Value });
         cmd.Parameters.AddWithValue("@id", deliveryId);
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }

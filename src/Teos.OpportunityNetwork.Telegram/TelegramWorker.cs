@@ -16,7 +16,7 @@ public sealed class TelegramWorker : IHostedService
     private readonly ITelegramClient _client;
     private readonly Func<Guid, string> _resolveChatId;
     private readonly Options _options;
-    private Timer _timer;
+    private Timer? _timer;
     private readonly TimeSpan _interval = TimeSpan.FromSeconds(30); // run every 30 seconds
 
     public TelegramWorker(

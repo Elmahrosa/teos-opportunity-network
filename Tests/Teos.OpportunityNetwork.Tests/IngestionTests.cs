@@ -243,7 +243,7 @@ public class IngestionTests
     }
 
     [Fact]
-    public void GitHub_collector_omits_authorization_header_without_token()
+    public async Task GitHub_collector_omits_authorization_header_without_token()
     {
         var handler = new RecordingHandler(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
         {
@@ -251,7 +251,7 @@ public class IngestionTests
         });
         var http = new HttpClient(handler);
 
-        _ = new GitHubBountyCollector(http, token: null).CollectAsync().GetAwaiter().GetResult();
+        await new GitHubBountyCollector(http, token: null).CollectAsync();
 
         Assert.Null(handler.LastAuthorization);
         Assert.Equal("application/vnd.github+json", handler.LastAccept);

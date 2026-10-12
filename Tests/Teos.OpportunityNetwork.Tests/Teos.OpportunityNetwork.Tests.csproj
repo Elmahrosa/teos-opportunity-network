@@ -19,6 +19,7 @@
     <ProjectReference Include="..\..\src\Teos.OpportunityNetwork.Ingestion\Teos.OpportunityNetwork.Ingestion.csproj" />
     <ProjectReference Include="..\..\src\Teos.OpportunityNetwork.Matching\Teos.OpportunityNetwork.Matching.csproj" />
     <ProjectReference Include="..\..\src\Teos.OpportunityNetwork.Persistence\Teos.OpportunityNetwork.Persistence.csproj" />
+    <ProjectReference Include="..\..\src\Teos.OpportunityNetwork.Runner\Teos.OpportunityNetwork.Runner.csproj" />
     <ProjectReference Include="..\..\src\Teos.OpportunityNetwork.Telegram\Teos.OpportunityNetwork.Telegram.csproj" />
   </ItemGroup>
 </Project>

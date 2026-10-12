@@ -25,11 +25,16 @@ public sealed class TelegramBot
         switch (command)
         {
             case "/start":
-                await RegisterChatAsync(chatId, knownUserId, ct).ConfigureAwait(false);
+            {
+                var linked = await RegisterChatAsync(chatId, knownUserId, ct).ConfigureAwait(false);
+                // Only confirm when the chat was actually linked — never claim a false success.
                 await _client.SendAsync(chatId.ToString(),
-                    "<b>TEOS Opportunity Network</b>\nYour chat is linked. You will receive ALERT-level match notifications.",
+                    linked
+                        ? "<b>TEOS Opportunity Network</b>\nYour chat is linked. You will receive ALERT-level match notifications."
+                        : "This chat is not linked to a TEOS profile yet. Link it before enabling notifications.",
                     ct).ConfigureAwait(false);
                 break;
+            }
 
             case "/pause":
                 await SetPausedAsync(chatId, true, ct).ConfigureAwait(false);
@@ -48,9 +53,9 @@ public sealed class TelegramBot
         }
     }
 
-    private async Task RegisterChatAsync(long chatId, Guid? userId, CancellationToken ct)
+    private async Task<bool> RegisterChatAsync(long chatId, Guid? userId, CancellationToken ct)
     {
-        if (userId is null) return; // cannot link without an authenticated user mapping
+        if (userId is null) return false; // cannot link without an authenticated user mapping
         await using var conn = new NpgsqlConnection(_conn);
         await conn.OpenAsync(ct).ConfigureAwait(false);
         await using var tx = await conn.BeginTransactionAsync(ct).ConfigureAwait(false);
@@ -67,6 +72,7 @@ public sealed class TelegramBot
         resume.Parameters.AddWithValue("@u", userId.Value);
         await resume.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         await tx.CommitAsync(ct).ConfigureAwait(false);
+        return true;
     }
 
     private async Task SetPausedAsync(long chatId, bool paused, CancellationToken ct)

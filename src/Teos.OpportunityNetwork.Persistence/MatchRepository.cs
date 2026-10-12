@@ -87,6 +87,48 @@ public sealed class MatchRepository
         return result is true;
     }
 
+    /// <summary>True when a match for this (opportunity, user, weights, engine) version pair is already persisted.</summary>
+    public async Task<bool> HasMatchAsync(Guid opportunityId, Guid userId, string weightsVersion, string engineVersion, CancellationToken ct = default)
+    {
+        await using var conn = new NpgsqlConnection(_conn);
+        await conn.OpenAsync(ct).ConfigureAwait(false);
+        await using var cmd = new NpgsqlCommand(@"
+            SELECT EXISTS (
+                SELECT 1 FROM opportunity_matches
+                WHERE opportunity_id = @o AND user_id = @u
+                  AND weights_version = @w AND engine_version = @e)",
+            conn);
+        cmd.Parameters.AddWithValue("@o", opportunityId);
+        cmd.Parameters.AddWithValue("@u", userId);
+        cmd.Parameters.AddWithValue("@w", weightsVersion);
+        cmd.Parameters.AddWithValue("@e", engineVersion);
+        var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        return result is true;
+    }
+
+    /// <summary>Reads the persisted match for a version pair, if any (runtime observability / tests).</summary>
+    public async Task<MatchResult?> FindSavedMatchAsync(Guid opportunityId, Guid userId, string weightsVersion, string engineVersion, CancellationToken ct = default)
+    {
+        await using var conn = new NpgsqlConnection(_conn);
+        await conn.OpenAsync(ct).ConfigureAwait(false);
+        await using var cmd = new NpgsqlCommand(@"
+            SELECT id, opportunity_id, user_id, match_score, decision, recommended_action,
+                   skill_match, experience_match, budget_match, location_match, urgency_score,
+                   semantic_score, confidence, matched_skills, missing_skills, reasons, warnings,
+                   scoring_config, weights_version, engine_version, snapshot_source_id, created_at
+            FROM opportunity_matches
+            WHERE opportunity_id = @o AND user_id = @u
+              AND weights_version = @w AND engine_version = @e", conn);
+        cmd.Parameters.AddWithValue("@o", opportunityId);
+        cmd.Parameters.AddWithValue("@u", userId);
+        cmd.Parameters.AddWithValue("@w", weightsVersion);
+        cmd.Parameters.AddWithValue("@e", engineVersion);
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        if (!await reader.ReadAsync(ct).ConfigureAwait(false)) return null;
+        return ReadMatch(reader);
+    }
+
     /// <summary>
     /// Read-only feed of ALERT matches that still need delivery.
     /// Excludes matches with a SENT delivery (anti-join) and paused users.

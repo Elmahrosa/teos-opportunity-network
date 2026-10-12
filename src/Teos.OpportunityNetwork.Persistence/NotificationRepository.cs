@@ -180,12 +180,19 @@ public sealed class NotificationRepository
     {
         await using var conn = new NpgsqlConnection(_conn);
         await conn.OpenAsync(ct).ConfigureAwait(false);
+        await using var tx = await conn.BeginTransactionAsync(ct).ConfigureAwait(false);
 
+        // The FOR UPDATE lock must cover the read AND the write in the same transaction;
+        // in autocommit the row lock would be released right after the SELECT (TOCTOU race).
         await using var read = new NpgsqlCommand(
-            "SELECT attempt_count FROM notification_deliveries WHERE id = @id FOR UPDATE", conn);
+            "SELECT attempt_count FROM notification_deliveries WHERE id = @id FOR UPDATE", conn, tx);
         read.Parameters.AddWithValue("@id", deliveryId);
         var attempts = await read.ExecuteScalarAsync(ct).ConfigureAwait(false);
-        if (attempts is null) return;
+        if (attempts is null)
+        {
+            await tx.RollbackAsync(ct).ConfigureAwait(false);
+            return;
+        }
         var attempt = (int)attempts;
 
         var canRetry = retryable && attempt < maxAttempts;
@@ -199,11 +206,12 @@ public sealed class NotificationRepository
         await using var cmd = new NpgsqlCommand(@"
             UPDATE notification_deliveries
             SET status = 'FAILED', last_error = @e, next_attempt_at = @next, updated_at = now()
-            WHERE id = @id AND status <> 'SENT'", conn);
+            WHERE id = @id AND status <> 'SENT'", conn, tx);
         cmd.Parameters.AddWithValue("@e", Truncate(sanitizedError, 2000));
         cmd.Parameters.Add(new NpgsqlParameter("@next", NpgsqlTypes.NpgsqlDbType.TimestampTz) { Value = (object?)nextAttempt ?? DBNull.Value });
         cmd.Parameters.AddWithValue("@id", deliveryId);
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        await tx.CommitAsync(ct).ConfigureAwait(false);
     }
 
     /// <summary>Reclaims SENDING rows stranded by a crashed worker so they can be retried.</summary>

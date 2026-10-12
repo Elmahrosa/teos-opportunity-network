@@ -34,10 +34,13 @@ public sealed class HybridMatcher
     }
 
     /// <summary>
-    /// Full pipeline: evaluate semantics (if configured) → validate schema → capture snapshot →
-    /// score. Invalid LLM output throws <see cref="SemanticValidationException"/> before scoring.
+    /// Full pipeline returning BOTH the result and the immutable evidence snapshot, so the
+    /// caller can persist both atomically via MatchRepository.SaveAsync(match, snapshot).
+    /// Evaluate semantics (if configured) → validate schema → capture snapshot → score.
+    /// Invalid LLM output throws <see cref="SemanticValidationException"/> before scoring.
     /// </summary>
-    public async Task<MatchResult> MatchAsync(Opportunity opportunity, UserProfile profile, double confidence = 0.9, CancellationToken ct = default)
+    public async Task<(MatchResult Match, InputSnapshot Snapshot)> MatchWithSnapshotAsync(
+        Opportunity opportunity, UserProfile profile, double confidence = 0.9, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(opportunity);
         ArgumentNullException.ThrowIfNull(profile);
@@ -55,7 +58,14 @@ public sealed class HybridMatcher
         }
 
         var snapshot = SnapshotFactory.Capture(opportunity, profile, semantic, _config.WeightsVersion);
-        return Score(opportunity, profile, snapshot, semantic, confidence);
+        return (Score(opportunity, profile, snapshot, semantic, confidence), snapshot);
+    }
+
+    /// <summary>Full pipeline: match only, without the evidence snapshot.</summary>
+    public async Task<MatchResult> MatchAsync(Opportunity opportunity, UserProfile profile, double confidence = 0.9, CancellationToken ct = default)
+    {
+        var result = await MatchWithSnapshotAsync(opportunity, profile, confidence, ct).ConfigureAwait(false);
+        return result.Match;
     }
 
     private static string Describe(Opportunity o) =>

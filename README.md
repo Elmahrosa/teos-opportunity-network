@@ -139,11 +139,13 @@ See [.env.example](.env.example). Never commit real values.
 
 | Variable | Purpose |
 |---|---|
-| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather (required for real sends) |
+| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather (required for real sends; runtime dry-runs without it) |
 | `TELEGRAM_CHAT_ID` | Fallback chat id for single-chat setups |
 | `GITHUB_TOKEN` | Optional; Bearer auth for the GitHub search API |
-| `OPENAI_API_KEY` | Optional; semantic evaluation |
+| `OPENAI_API_KEY` | Optional; semantic evaluation (matcher falls back to neutral-50 without it) |
 | `DATABASE_URL` / `TEOS_TEST_DB` | Application / test database connection strings |
+| `TEOS_LOOP_SECONDS` | `--loop` interval in seconds (default 300) |
+| `TEOS_CONFIDENCE` | Confidence stored with each match result (default 0.9) |
 
 ## Test commands
 
@@ -165,3 +167,42 @@ Tests use a real PostgreSQL database (never SQLite). `TEOS_TEST_DB` overrides th
 dotnet build Teos.OpportunityNetwork.sln
 dotnet test
 ```
+
+## Step 10 — notification runtime (`--once` / `--loop`)
+
+The Runner now has a real runtime entry point that executes the full pipeline:
+
+```text
+Collect (GitHub search) → Normalize → Deduplicate → Match (HYBRID_V1) → Persist evidence → Notify (Telegram)
+```
+
+| Mode | Behavior |
+|---|---|
+| `--valuation` | Repo valuation CLI (existing behavior; `--repo-url`, `--output-json`, `--tier`, `--smoke`). Legacy alias `smoke` still works. |
+| `--once` | One full pipeline pass, then exit. Prints an ingested/matched/delivered report. |
+| `--loop [--interval SECS]` | Runs the pipeline on an interval (default `TEOS_LOOP_SECONDS`, 300 s) until Ctrl+C. |
+| `--help` | Usage. Unknown flags exit 1 with help. |
+
+```bash
+# one pass (needs DATABASE_URL; dry-runs Telegram without TELEGRAM_BOT_TOKEN)
+docker run -d --name teos-pg -p 54329:5432 \
+  -e POSTGRES_USER=teos -e POSTGRES_PASSWORD=teos_dev -e POSTGRES_DB=teos \
+  postgres:16
+psql "Host=localhost;Port=54329;Username=teos;Password=teos_dev;Database=teos" -f migrations/0001_init.sql
+
+dotnet run --project src/Teos.OpportunityNetwork.Runner -- --once
+dotnet run --project src/Teos.OpportunityNetwork.Runner -- --loop --interval 600
+```
+
+Live Telegram smoke (first real bot message):
+
+1. Create a bot with @BotFather and put its token in `TELEGRAM_BOT_TOKEN` and your chat id in `TELEGRAM_CHAT_ID`.
+2. Seed one user profile and link the chat:
+   ```sql
+   INSERT INTO user_profiles (id, display_name, skills, years_experience, preferred_types)
+   VALUES (gen_random_uuid(), 'You', '{csharp}', 5, '{BOUNTY}');
+   INSERT INTO telegram_chats (user_id, chat_id)
+   SELECT id, '<your-chat-id>' FROM user_profiles LIMIT 1;
+   ```
+3. `dotnet run --project src/Teos.OpportunityNetwork.Runner -- --once`
+4. When a collected opportunity scores ≥ 85 (ALERT) you receive the Telegram notification. Without a token, the same pass runs end-to-end in dry-run and logs what it would have sent.

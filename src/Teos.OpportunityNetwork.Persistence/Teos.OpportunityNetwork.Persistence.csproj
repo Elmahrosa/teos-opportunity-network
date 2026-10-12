@@ -9,5 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Npgsql" Version="8.0.5" />
     <ProjectReference Include="..\Teos.OpportunityNetwork.Core\Teos.OpportunityNetwork.Core.csproj" />
+    <!-- IOpportunityStore (read side for deduplication) is defined by Ingestion. -->
+    <ProjectReference Include="..\Teos.OpportunityNetwork.Ingestion\Teos.OpportunityNetwork.Ingestion.csproj" />
   </ItemGroup>
 </Project>

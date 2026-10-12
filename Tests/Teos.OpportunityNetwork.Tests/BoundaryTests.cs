@@ -102,6 +102,39 @@ public class BoundaryTests
     }
 
     [Fact]
+    public void Runner_does_not_redefine_domain_types()
+    {
+        var dir = FindSourceDir(Path.Combine("src", "Teos.OpportunityNetwork.Runner"));
+        foreach (var file in Directory.GetFiles(dir, "*.cs", SearchOption.AllDirectories))
+        {
+            var text = File.ReadAllText(file);
+            var name = Path.GetFileName(file);
+            AssertAbsent("class NormalizedOpportunity", text, name);
+            AssertAbsent("static class Normalizer", text, name);
+            AssertAbsent("class MatchScoring", text, name);
+            AssertAbsent("class Deduplicator", text, name);
+            AssertAbsent("class SemanticEvaluator", text, name);
+        }
+    }
+
+    [Fact]
+    public void Runner_contains_no_scoring_normalization_or_dedup_logic()
+    {
+        var dir = FindSourceDir(Path.Combine("src", "Teos.OpportunityNetwork.Runner"));
+        foreach (var file in Directory.GetFiles(dir, "*.cs", SearchOption.AllDirectories))
+        {
+            var text = File.ReadAllText(file);
+            var name = Path.GetFileName(file);
+            // The Runner orchestrates these libraries; it must never re-implement them.
+            AssertAbsent("SemanticValidator", text, name);
+            AssertAbsent("NeutralSemantic", text, name);
+            AssertAbsent("MatchScoring", text, name);
+            AssertAbsent("Weights[", text, name);
+            AssertAbsent("ComputeContentHash", text, name);
+        }
+    }
+
+    [Fact]
     public void No_source_file_hardcodes_secrets()
     {
         string[] roots = { FindSourceDir("src"), FindSourceDir("Tests"), FindSourceDir("migrations") };

@@ -89,7 +89,7 @@ public class ReplayBenchmarkTests
     }
 
     [Fact]
-    public void Replay_never_calls_the_LLM()
+    public async Task Replay_never_calls_the_LLM()
     {
         var (opp, profile) = Build();
         var snapshot = SnapshotFactory.Capture(opp, profile, 80, ScoringConfig.HybridV1);
@@ -97,8 +97,8 @@ public class ReplayBenchmarkTests
         // HybridMatcher constructed with semanticEvaluator: null — and ReplayEngine never
         // touches an evaluator. The ForbiddenSemanticEvaluator proves the boundary if wired.
         var forbidden = new ForbiddenSemanticEvaluator();
-        Assert.ThrowsAsync<InvalidOperationException>(() =>
-            forbidden.EvaluateAsync("opportunity", "profile")).GetAwaiter().GetResult();
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            forbidden.EvaluateAsync("opportunity", "profile"));
 
         var replay = ReplayEngine.RescoreFromSnapshot(snapshot, ScoringConfig.CreateHybridV1());
         Assert.Equal(80, replay.SemanticScore); // stored value reused verbatim

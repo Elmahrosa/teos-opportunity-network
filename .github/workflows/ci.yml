@@ -2,27 +2,47 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [master, main]
   pull_request:
-    branches: [ main ]
+    branches: [master, main]
 
 jobs:
-  build:
-    runs-on: windows-latest
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: teos
+          POSTGRES_PASSWORD: teos_test
+          POSTGRES_DB: postgres
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U teos"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: 8.0.x
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
 
-    - name: Restore dependencies
-      run: dotnet restore
+      - name: Restore
+        run: dotnet restore
 
-    - name: Build
-      run: dotnet build --no-restore
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
 
-    - name: Test
-      run: dotnet test --no-build --verbosity normal
+      - name: Test
+        run: dotnet test --no-build --configuration Release --verbosity normal
+        env:
+          TEOS_TEST_DB: "Host=localhost;Port=54329;Username=teos;Password=teos_test;Database=postgres"
+
+      - name: Smoke Test - Repo Valuation
+        run: dotnet run --project src/Teos.OpportunityNetwork.Runner/Teos.OpportunityNetwork.Runner.csproj --configuration Release -- smoke

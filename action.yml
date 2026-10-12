@@ -1,27 +1,68 @@
-name: 'TEOS Sovereign Repo Valuation'
-description: 'Value your GitHub repo as asset - Score 0-100 + dollar estimation. Deterministic, no LLM.'
-author: 'Elmahrosa'
+name: 'TEOS Repo Valuation'
+description: 'Score any GitHub repo 0-100 + valuation estimate - TEOS Opportunity Network'
+author: 'TEOS Egypt'
 branding:
-  icon: 'dollar-sign'
-  color: 'green'
+  icon: 'shield'
+  color: 'yellow'
+
 inputs:
+  repo:
+    description: 'Repo to score (owner/repo)'
+    required: true
   github-token:
-    description: 'GITHUB_TOKEN'
+    description: 'GitHub token for API'
     required: false
     default: ${{ github.token }}
+  mode:
+    description: 'smoke or full'
+    required: false
+    default: 'smoke'
+
 outputs:
   score:
-    description: 'TEOS Score 0-100'
+    description: 'Repo score 0-100'
+    value: ${{ steps.valuation.outputs.score }}
   valuation:
-    description: 'Estimated range'
+    description: 'Estimated valuation range'
+    value: ${{ steps.valuation.outputs.valuation }}
   decision:
-    description: 'ALERT/LOG/IGNORE'
+    description: 'ALERT / LOG / IGNORE'
+    value: ${{ steps.valuation.outputs.decision }}
+
 runs:
   using: 'composite'
   steps:
     - uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
-    - name: Run TEOS Valuation
+
+    - id: valuation
+      name: Run Valuation
       shell: bash
-      run: dotnet run --project src/Teos.OpportunityNetwork.Runner/Teos.OpportunityNetwork.Runner.csproj -- smoke
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        TEOS_GITHUB_TOKEN: ${{ inputs.github-token }}
+        TEOS_INPUT_REPO: ${{ inputs.repo }}
+        TEOS_INPUT_MODE: ${{ inputs.mode }}
+      run: |
+        set -euo pipefail
+        PROJECT="${{ github.action_path }}/src/Teos.OpportunityNetwork.Runner/Teos.OpportunityNetwork.Runner.csproj"
+
+        if [ "$TEOS_INPUT_MODE" = "full" ]; then
+          OUTPUT=$(dotnet run --project "$PROJECT" --configuration Release -- --repo-url "https://github.com/${TEOS_INPUT_REPO}")
+        else
+          OUTPUT=$(dotnet run --project "$PROJECT" --configuration Release -- smoke)
+        fi
+        printf '%s\n' "$OUTPUT"
+
+        SCORE=$(printf '%s\n' "$OUTPUT" | sed -n 's/.*Score=\([0-9][0-9]*\)\/100.*/\1/p' | head -n1)
+        VALUES=$(printf '%s\n' "$OUTPUT" | sed -n 's/.*| *\$\([0-9][0-9]*\)-\$\([0-9][0-9]*\).*/\1 \2/p' | head -n1)
+        VALUE_LOW=${VALUES%% *}
+        VALUE_HIGH=${VALUES##* }
+        DECISION=$(printf '%s\n' "$OUTPUT" | sed -n 's#.*| *\([A-Z][A-Z]*\)/[A-Z]*.*#\1#p' | head -n1)
+
+        {
+          echo "score=${SCORE:-0}"
+          echo "valuation=${VALUE_LOW:-0}-${VALUE_HIGH:-0}"
+          echo "decision=${DECISION:-IGNORE}"
+        } >> "$GITHUB_OUTPUT"

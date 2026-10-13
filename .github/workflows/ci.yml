@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ master, main ]
 
+# Least privilege: CI uses no elevated token surface.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest

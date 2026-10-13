@@ -11,6 +11,7 @@ name: Scanner (non-stop)
 #   DATABASE_URL          connection string to a PERSISTENT PostgreSQL (free tiers: Neon, Supabase).
 #                         It must survive between runs — dedup + evidence live there.
 #   TELEGRAM_BOT_TOKEN    your @BotFather token (optional: without it the pass dry-runs).
+#   TELEGRAM_CHAT_ID      chat id for the bot (env fallback; chat ids normally come from the DB).
 #   TEOS_GITHUB_TOKEN     optional GitHub token for the collector (higher API rate limits).
 #   TEOS_LLM_PROVIDERS    e.g. "groq,openrouter" (optional: without it, neutral-50 semantic).
 #   GROQ_API_KEY, OPENROUTER_API_KEY, GEMINI_API_KEY, MISTRAL_API_KEY, GITHUB_API_KEY
@@ -27,6 +28,11 @@ on:
 
 permissions:
   contents: read
+
+# Serialize scanner runs so a manual dispatch can never overlap a scheduled run.
+concurrency:
+  group: scanner-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   scan:
@@ -54,6 +60,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TEOS_GITHUB_TOKEN: ${{ secrets.TEOS_GITHUB_TOKEN }}
           TEOS_LLM_PROVIDERS: ${{ secrets.TEOS_LLM_PROVIDERS }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -68,7 +75,7 @@ jobs:
             echo "::error::required secret DATABASE_URL is not set. Add it under Settings → Secrets and variables → Actions (persistent free Postgres, e.g. Neon/Supabase)."
             exit 1
           fi
-          for name in TELEGRAM_BOT_TOKEN TEOS_GITHUB_TOKEN TEOS_LLM_PROVIDERS GROQ_API_KEY OPENROUTER_API_KEY GEMINI_API_KEY MISTRAL_API_KEY GITHUB_API_KEY OPENAI_API_KEY; do
+          for name in TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID TEOS_GITHUB_TOKEN TEOS_LLM_PROVIDERS GROQ_API_KEY OPENROUTER_API_KEY GEMINI_API_KEY MISTRAL_API_KEY GITHUB_API_KEY OPENAI_API_KEY; do
             val="${!name}"
             if [ -n "$val" ]; then echo "[secrets] $name: set"; else echo "[secrets] $name: (not set)"; fi
           done

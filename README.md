@@ -2,7 +2,7 @@
 
 **by Elmahrosa**
 
-[![Marketplace](https://img.shields.io/badge/Marketplace-TEOS%20Sovereign%20Repo%20Valuation-blue?logo=github)](https://github.com/marketplace/actions/teos-sovereign-repo-valuation)
+[![TEOS Sovereign Repo Valuation](https://img.shields.io/badge/Action-TEOS%20Sovereign%20Repo%20Valuation-blue?logo=github)](https://github.com/Elmahrosa/teos-repo-valuation)
 
 A deterministic opportunity scanner (`--once` / `--loop`) with a GitHub repo valuation action. Scores 0–100 with fixed thresholds (≥85 ALERT, ≥90 APPLY_NOW) and alerts via Telegram only when the bar is cleared. Matching is deterministic; an optional LLM semantic signal is capped at its configured weight and falls back to neutral-50 without an API key. Not a traditional job board.
 
@@ -18,11 +18,13 @@ Discover opportunities
 
 ## Use the GitHub Action
 
-This repository ships a composite GitHub Action — **TEOS Sovereign Repo Valuation** (see [`action.yml`](action.yml)) — that scores a repository **0–100** and estimates a value range. Deterministic; no LLM.
+The **TEOS Sovereign Repo Valuation** action now lives in its own public repository:
+[`Elmahrosa/teos-repo-valuation`](https://github.com/Elmahrosa/teos-repo-valuation). It scores a
+repository **0–100** and estimates a value range. Deterministic; no LLM.
 
 ```yaml
 # .github/workflows/valuations.yml
-- uses: Elmahrosa/teos-opportunity-network@v1.1.1
+- uses: Elmahrosa/teos-repo-valuation@v1.2.1
   with:
     github-token: ${{ github.token }}
 ```
@@ -156,7 +158,7 @@ Bot commands (only what the profile model supports — implemented and tested): 
 
 ## Non-stop scheduled scanning (free)
 
-[`.github/workflows/scanner.yml`](.github/workflows/scanner.yml) runs the full pipeline **every 30 minutes** on GitHub-hosted runners — free for public repositories — plus on-demand via `workflow_dispatch`.
+[`.github/workflows/scanner.yml`](.github/workflows/scanner.yml) runs the full pipeline **hourly** on GitHub-hosted runners — free for public repositories — plus on-demand via `workflow_dispatch`. (If the repository is private, scheduled runs count against the 2,000 free private Actions minutes/month; hourly is chosen to fit that budget at ~2 min/run. To restore 30-minute cadence, set `TEOS_SCAN_INTERVAL` lower **and** budget for paid minutes.)
 
 1. Provision a **persistent** PostgreSQL on a free tier ([Neon](https://neon.tech), [Supabase](https://supabase.com)) and set the repo secret `DATABASE_URL`. Ephemeral databases break dedup/evidence between runs. The workflow runs `--migrate` (idempotent schema bootstrap) before every scan, so a fresh database needs no manual SQL.
 2. Add secrets for the free LLM providers you want (`TEOS_LLM_PROVIDERS` + `{NAME}_API_KEY`), `TELEGRAM_BOT_TOKEN` for real alerts, and `TEOS_GITHUB_TOKEN` for collector rate limits.

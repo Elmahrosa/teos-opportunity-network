@@ -1,7 +1,11 @@
 name: Scanner (non-stop)
 
-# Near-continuous scanning for $0: GitHub-hosted runners are free for public repositories.
-# Runs one full pipeline pass every 30 minutes; also runnable on demand from the Actions tab.
+# Near-continuous scanning for $0 on PUBLIC repositories: GitHub-hosted runners are free there.
+# Runs one full pipeline pass every hour; also runnable on demand from the Actions tab.
+#
+# NOTE: if this repository is made PRIVATE, scheduled runs count against the 2,000 free
+# private Actions minutes/month — the hourly cadence fits (~2 min/run × 720 ≈ 1,440 min/mo).
+# Going back to a 30-minute cadence would exceed the free private quota.
 #
 # Required repo secrets (Settings → Secrets and variables → Actions):
 #   DATABASE_URL          connection string to a PERSISTENT PostgreSQL (free tiers: Neon, Supabase).
@@ -18,7 +22,7 @@ name: Scanner (non-stop)
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '0 * * * *'
   workflow_dispatch:
 
 permissions:

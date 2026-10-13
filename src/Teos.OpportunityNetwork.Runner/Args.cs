@@ -17,6 +17,8 @@ public static class RunnerArgs
                                      ingest → normalize → dedup → match → persist → notify (Telegram).
           --loop [--interval SECS]   Run the notification pipeline on an interval until stopped
                                      (Ctrl+C). Interval overrides TEOS_LOOP_SECONDS (default 300).
+          --migrate                  Idempotently apply migrations/0001_init.sql to DATABASE_URL
+                                     (safe to run on every scan; CREATE TABLE IF NOT EXISTS).
           --help                     Show this help.
 
         Environment (once/loop):
@@ -45,6 +47,8 @@ public static class RunnerArgs
                 return new RunnerMode(RunnerModeKind.Loop, LoopInterval: ParseInterval(list, fallback: null));
             case "--once" or "once":
                 return new RunnerMode(RunnerModeKind.Once, LoopInterval: ParseInterval(list, fallback: null));
+            case "--migrate" or "migrate":
+                return new RunnerMode(RunnerModeKind.Migrate);
             case "--valuation" or "valuation":
                 return ValuationMode(list.Skip(1).ToArray());
             case "smoke" or "--smoke":
@@ -105,7 +109,8 @@ public enum RunnerModeKind
     Help,
     Valuation,
     Once,
-    Loop
+    Loop,
+    Migrate
 }
 
 public sealed record RunnerMode(RunnerModeKind Kind, ValuationArgs? Valuation = null, TimeSpan? LoopInterval = null);

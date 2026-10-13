@@ -21,7 +21,7 @@ public static class NotificationCli
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"::error::notification pass failed: {NotificationRuntime.Sanitize(ex.Message)}");
+            Console.Error.WriteLine($"::error::notification pass failed: {CliRedact(ex.Message)}");
             return 1;
         }
     }
@@ -56,10 +56,14 @@ public static class NotificationCli
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"::error::loop failed: {NotificationRuntime.Sanitize(ex.Message)}");
+            Console.Error.WriteLine($"::error::loop failed: {CliRedact(ex.Message)}");
             return 1;
         }
     }
+
+    /// <summary>Redacts every secret visible in the process environment before printing (world-readable public Actions logs).</summary>
+    internal static string CliRedact(string message) =>
+        SecretRedactor.RedactSecrets(message, SecretRedactor.FromCurrentEnvironment());
 
     private static NotificationRuntime BuildRuntime()
     {

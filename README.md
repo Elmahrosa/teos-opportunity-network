@@ -158,7 +158,7 @@ Bot commands (only what the profile model supports — implemented and tested): 
 
 [`.github/workflows/scanner.yml`](.github/workflows/scanner.yml) runs the full pipeline **every 30 minutes** on GitHub-hosted runners — free for public repositories — plus on-demand via `workflow_dispatch`.
 
-1. Provision a **persistent** PostgreSQL on a free tier ([Neon](https://neon.tech), [Supabase](https://supabase.com)) and set the repo secret `DATABASE_URL`. Ephemeral databases break dedup/evidence between runs.
+1. Provision a **persistent** PostgreSQL on a free tier ([Neon](https://neon.tech), [Supabase](https://supabase.com)) and set the repo secret `DATABASE_URL`. Ephemeral databases break dedup/evidence between runs. The workflow runs `--migrate` (idempotent schema bootstrap) before every scan, so a fresh database needs no manual SQL.
 2. Add secrets for the free LLM providers you want (`TEOS_LLM_PROVIDERS` + `{NAME}_API_KEY`), `TELEGRAM_BOT_TOKEN` for real alerts, and `TEOS_GITHUB_TOKEN` for collector rate limits.
 3. Each scheduled pass behaves exactly like a local `--once`: collect → normalize → dedup → match (ensemble semantic) → persist → notify. A pass failure never blocks the next run.
 
@@ -244,6 +244,7 @@ Collect (GitHub search) → Normalize → Deduplicate → Match (HYBRID_V1) → 
 | `--valuation` | Repo valuation CLI (existing behavior; `--repo-url`, `--output-json`, `--tier`, `--smoke`). Legacy alias `smoke` still works. |
 | `--once` | One full pipeline pass, then exit. Prints an ingested/matched/delivered report. |
 | `--loop [--interval SECS]` | Runs the pipeline on an interval (default `TEOS_LOOP_SECONDS`, 300 s) until Ctrl+C. |
+| `--migrate` | Idempotently applies `migrations/0001_init.sql` to `DATABASE_URL` (safe on every run). |
 | `--help` | Usage. Unknown flags exit 1 with help. |
 
 ```bash
@@ -251,11 +252,16 @@ Collect (GitHub search) → Normalize → Deduplicate → Match (HYBRID_V1) → 
 docker run -d --name teos-pg -p 54329:5432 \
   -e POSTGRES_USER=teos -e POSTGRES_PASSWORD=teos_dev -e POSTGRES_DB=teos \
   postgres:16
-psql "Host=localhost;Port=54329;Username=teos;Password=teos_dev;Database=teos" -f migrations/0001_init.sql
 
+dotnet run --project src/Teos.OpportunityNetwork.Runner -- --migrate   # apply schema (idempotent)
 dotnet run --project src/Teos.OpportunityNetwork.Runner -- --once
 dotnet run --project src/Teos.OpportunityNetwork.Runner -- --loop --interval 600
 ```
+
+**Secrets safety (public repo):** the runner redacts `DATABASE_URL`, the Telegram token, and every
+`*_API_KEY` from logs and error messages before they reach stdout/stderr (`SecretRedactor`, incl.
+Npgsql `Password=` segments). The scheduled scanner's first step checks that required secrets are
+present and prints **set / not set only** — a value is never echoed into world-readable Actions logs.
 
 Live Telegram smoke (first real bot message):
 

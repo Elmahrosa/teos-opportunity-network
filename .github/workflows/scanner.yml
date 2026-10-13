@@ -45,9 +45,44 @@ jobs:
           restore-keys: |
             scanner-${{ runner.os }}-
 
+      - name: Check required secrets (presence only — values are never printed)
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TEOS_GITHUB_TOKEN: ${{ secrets.TEOS_GITHUB_TOKEN }}
+          TEOS_LLM_PROVIDERS: ${{ secrets.TEOS_LLM_PROVIDERS }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          GITHUB_API_KEY: ${{ secrets.GITHUB_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          # Logs on this public repo are world-readable: never echo a secret VALUE, ever.
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::required secret DATABASE_URL is not set. Add it under Settings → Secrets and variables → Actions (persistent free Postgres, e.g. Neon/Supabase)."
+            exit 1
+          fi
+          for name in TELEGRAM_BOT_TOKEN TEOS_GITHUB_TOKEN TEOS_LLM_PROVIDERS GROQ_API_KEY OPENROUTER_API_KEY GEMINI_API_KEY MISTRAL_API_KEY GITHUB_API_KEY OPENAI_API_KEY; do
+            val="${!name}"
+            if [ -n "$val" ]; then echo "[secrets] $name: set"; else echo "[secrets] $name: (not set)"; fi
+          done
+
       - name: Build Runner (Release)
         shell: bash
         run: dotnet build src/Teos.OpportunityNetwork.Runner/Teos.OpportunityNetwork.Runner.csproj -c Release --nologo
+
+      - name: Apply schema (idempotent --migrate)
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -n "$DATABASE_URL" ]; then
+            dotnet src/Teos.OpportunityNetwork.Runner/bin/Release/net8.0/Teos.OpportunityNetwork.Runner.dll --migrate
+          else
+            echo "::warning::DATABASE_URL not set — skipping --migrate"
+          fi
 
       - name: Run opportunity scan (--once)
         shell: bash

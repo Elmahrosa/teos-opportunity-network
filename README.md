@@ -2,7 +2,7 @@
 
 **by Elmahrosa**
 
-[![TEOS Sovereign Repo Valuation](https://img.shields.io/badge/Action-TEOS%20Sovereign%20Repo%20Valuation-blue?logo=github)](https://github.com/Elmahrosa/teos-repo-valuation)
+[![TEOS Sovereign Repo Valuator](https://img.shields.io/badge/Action-TEOS%20Sovereign%20Repo%20Valuator-blue?logo=github)](https://github.com/Aymanseif/teos-repo-valuation)
 
 A deterministic opportunity scanner (`--once` / `--loop`) with a GitHub repo valuation action. Scores 0–100 with fixed thresholds (≥85 ALERT, ≥90 APPLY_NOW) and alerts via Telegram only when the bar is cleared. Matching is deterministic; an optional LLM semantic signal is capped at its configured weight and falls back to neutral-50 without an API key. Not a traditional job board.
 
@@ -18,13 +18,13 @@ Discover opportunities
 
 ## Use the GitHub Action
 
-The **TEOS Sovereign Repo Valuation** action now lives in its own public repository:
-[`Elmahrosa/teos-repo-valuation`](https://github.com/Elmahrosa/teos-repo-valuation). It scores a
+The **TEOS Sovereign Repo Valuator** action now lives in its own public repository:
+[`Aymanseif/teos-repo-valuation`](https://github.com/Aymanseif/teos-repo-valuation). It scores a
 repository **0–100** and estimates a value range. Deterministic; no LLM.
 
 ```yaml
 # .github/workflows/valuations.yml
-- uses: Elmahrosa/teos-repo-valuation@v1.2.1
+- uses: Aymanseif/teos-repo-valuation@v1.2.3
   with:
     github-token: ${{ github.token }}
 ```

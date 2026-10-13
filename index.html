@@ -290,10 +290,10 @@
     <!-- ACTION -->
     <section id="action">
         <div class="wrap">
-            <h2>The GitHub Action — <span style="color:var(--accent);">TEOS Sovereign Repo Valuation</span></h2>
+            <h2>The GitHub Action — <span style="color:var(--accent);">TEOS Sovereign Repo Valuator</span></h2>
             <p class="sub">
                 A composite action in its own repository —
-                <a href="https://github.com/Elmahrosa/teos-repo-valuation">Elmahrosa/teos-repo-valuation</a> —
+                <a href="https://github.com/Aymanseif/teos-repo-valuation">Aymanseif/teos-repo-valuation</a> —
                 that values a repository as an asset:
                 a deterministic 0–100 score plus an estimated dollar range. No LLM involved.
                 Works on any runner with .NET 8 support; the token defaults to the workflow's <code>github.token</code>.
@@ -302,7 +302,7 @@
                 <div class="panel">
                     <h3>Usage</h3>
                     <pre><span class="c"># .github/workflows/valuations.yml</span>
-- uses: Elmahrosa/teos-repo-valuation@v1.2.1
+- uses: Aymanseif/teos-repo-valuation@v1.2.3
   with:
     github-token: ${{ github.token }}</pre>
                     <table style="margin-top:0.8rem;">

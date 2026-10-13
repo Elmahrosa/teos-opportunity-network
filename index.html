@@ -186,11 +186,11 @@
                 <div class="card"><span class="step-num">STEP 1 · COLLECTOR</span><h3>Discover</h3><p>Queries <code>api.github.com/search/issues</code> with an optional Bearer token. Credentials are never hard-coded.</p></div>
                 <div class="card"><span class="step-num">STEP 2 · NORMALIZER</span><h3>Clean</h3><p>Deterministic normalization of title, description, URL, skills, type, budget, currency, dates. Produces a SHA-256 <code>content_hash</code>.</p></div>
                 <div class="card"><span class="step-num">STEP 3 · DEDUP</span><h3>Deduplicate</h3><p><code>UNIQUE(source, external_id)</code> is the hard boundary. Provenance is never destroyed — <code>input_snapshots</code> is append-only.</p></div>
-                <div class="card"><span class="step-num">STEP 4 · MATCHER</span><h3>Match</h3><p>Hard rules + weighted score + optional LLM semantic signal (capped at 5% weight in HYBRID_V1).</p></div>
+                <div class="card"><span class="step-num">STEP 4 · MATCHER</span><h3>Match</h3><p>Hard rules + weighted score + multi-agent semantic signal from free OpenAI-compatible models (deterministic median fusion, neutral-50 fallback).</p></div>
                 <div class="card"><span class="step-num">STEP 5/6 · REPOSITORY</span><h3>Persist</h3><p>Evidence is saved with its weights version. Re-saving never overwrites history — idempotent on <code>(opportunity, user, version)</code>.</p></div>
                 <div class="card"><span class="step-num">STEP 7 · GATE</span><h3>Threshold</h3><p><b>≥85 → ALERT</b>, ≥60 → LOG, below → IGNORE. Enforced in code and by PostgreSQL <code>CHECK</code> constraints.</p></div>
                 <div class="card"><span class="step-num">STEP 9 · DELIVERY</span><h3>Notify</h3><p>Telegram messages go through <code>PENDING → SENDING → SENT / FAILED → RETRY</code>. At most one SENT per (match, user, channel).</p></div>
-                <div class="card"><span class="step-num">STEP 10 · RUNTIME</span><h3>Run</h3><p><code>--once</code> one pass, <code>--loop</code> on an interval (default 300&nbsp;s). Without a token the same pass dry-runs honestly.</p></div>
+                <div class="card"><span class="step-num">STEP 10 · RUNTIME</span><h3>Run</h3><p><code>--once</code> one pass, <code>--loop</code> on an interval (default 300&nbsp;s), or a free scheduled GitHub Actions scanner every 30&nbsp;min. Without a token the same pass dry-runs honestly.</p></div>
             </div>
             <p class="sub" style="margin-top:1.2rem;">
                 Opportunity types: <code>JOB</code> · <code>PROJECT</code> · <code>BOUNTY</code> · <code>HACKATHON</code> · <code>SOFTWARE</code> · <code>SERVICE</code>
@@ -242,6 +242,12 @@
                     <p style="margin-bottom:0;">Invariants are enforced in code <i>and</i> by DB constraints: a score ≥ 90 can never be IGNORE or PASS.</p>
                 </div>
             </div>
+            <p class="sub" style="margin-top:1.2rem;">
+                <b>Semantic signal — free multi-agent ensemble:</b> several free OpenAI-compatible models (Groq, OpenRouter, Gemini,
+                Mistral, GitHub Models, local Ollama) score relevance in parallel. Valid judgments fuse by a <b>deterministic median</b>;
+                a failing model is skipped, never a crash; if all fail, the engine reports the documented <b>neutral-50</b>. Replay
+                reuses the stored snapshot — the models are never re-called.
+            </p>
         </div>
     </section>
 
@@ -333,7 +339,7 @@
                     <ul>
                         <li>Self-host the scanner (<code>--once</code> / <code>--loop</code>) in your own environment</li>
                         <li>One profile, GitHub search source</li>
-                        <li>Deterministic matching — semantic is optional (neutral-50 without a key)</li>
+                        <li>Deterministic matching — free multi-model semantic ensemble (neutral-50 if no free keys configured)</li>
                         <li>The repo valuation Action, free to use</li>
                     </ul>
                 </div>

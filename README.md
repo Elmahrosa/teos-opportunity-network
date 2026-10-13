@@ -24,7 +24,7 @@ repository **0–100** and estimates a value range. Deterministic; no LLM.
 
 ```yaml
 # .github/workflows/valuations.yml
-- uses: Aymanseif/teos-repo-valuation@v1.2.3
+- uses: Aymanseif/teos-repo-valuation@v1.2.4
   with:
     github-token: ${{ github.token }}
 ```

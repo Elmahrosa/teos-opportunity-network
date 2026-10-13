@@ -121,6 +121,24 @@ Boundary tests in `tests/Teos.OpportunityNetwork.Tests/BoundaryTests.cs` enforce
 
 Weights are configuration-driven, validated (must total `1.0`), and versioned. `confidence` is metadata and never modifies `match_score`. Unknown budgets are valid and scored neutrally — never penalized.
 
+## Semantic scoring with free LLMs (multi-agent ensemble)
+
+The optional semantic signal can run on **several free OpenAI-compatible models at once** ("all free LLMs"), scored as a deterministic ensemble — no paid OpenAI key required.
+
+- **One adapter, many providers**: `ChatCompletionsSemanticEvaluator` talks to any `/chat/completions` endpoint. Free-tier defaults ship for `groq`, `openrouter`, `mistral`, `gemini`, `github` (GitHub Models) — all via `TEOS_LLM_PROVIDERS=groq,openrouter…` plus `{NAME}_API_KEY`. `ollama` is keyless and runs locally.
+- **Multi-agent fusion**: `EnsembleSemanticEvaluator` runs every configured provider in parallel, schema-validates each raw output, and fuses the valid judgments with a **deterministic median** (even counts use the mean of the two middle values). Provider order is normalized — identical inputs always give identical output. A canonical JSON carries the fused `relevance`, a per-provider rationale, and the union of `matched_keywords`.
+- **Resilient**: a failing provider is skipped, never fails the pipeline. If *every* provider fails, the documented **neutral-50** signal is returned with an explicit `all providers failed` rationale. No key configured at all → the matcher's neutral-50 fallback, unchanged.
+- **Replay stays honest**: the fused value is stored in the immutable `input_snapshot`; replay/benchmark reuses it verbatim and never re-calls any LLM (see `ForbiddenSemanticEvaluator`).
+- **Legacy**: a lone `OPENAI_API_KEY` still configures single-provider OpenAI (`single:openai`).
+
+```bash
+# .env — run Groq + OpenRouter + a local Ollama as three scoring agents
+TEOS_LLM_PROVIDERS=groq,openrouter,ollama
+GROQ_API_KEY=gsk_...
+OPENROUTER_API_KEY=sk-or-...
+OLLAMA_BASE_URL=http://localhost:11434/v1
+```
+
 ## Step 9 — Telegram notification layer
 
 Telegram is a notification/UI layer only.
@@ -133,6 +151,16 @@ Telegram is a notification/UI layer only.
 - **Delivery guarantee**: at most one `SENT` row per `(match_id, user_id, channel)` enforced by a partial unique index plus an `already_alerted` double-check. Exactly-once cannot be guaranteed across a crash between provider accept and `mark_sent`; application-level idempotency is what is guaranteed.
 
 Bot commands (only what the profile model supports — implemented and tested): `/start`, `/pause`, `/resume`, `/help`, `/status`. `/status` reports the linked profile, notification state, and how many alerts were actually delivered (SENT) in the last 7 days.
+
+## Non-stop scheduled scanning (free)
+
+[`.github/workflows/scanner.yml`](.github/workflows/scanner.yml) runs the full pipeline **every 30 minutes** on GitHub-hosted runners — free for public repositories — plus on-demand via `workflow_dispatch`.
+
+1. Provision a **persistent** PostgreSQL on a free tier ([Neon](https://neon.tech), [Supabase](https://supabase.com)) and set the repo secret `DATABASE_URL`. Ephemeral databases break dedup/evidence between runs.
+2. Add secrets for the free LLM providers you want (`TEOS_LLM_PROVIDERS` + `{NAME}_API_KEY`), `TELEGRAM_BOT_TOKEN` for real alerts, and `TEOS_GITHUB_TOKEN` for collector rate limits.
+3. Each scheduled pass behaves exactly like a local `--once`: collect → normalize → dedup → match (ensemble semantic) → persist → notify. A pass failure never blocks the next run.
+
+Scheduled polling is near-continuous, not a literal daemon — for true 24/7 background operation, run `--loop` yourself on a server with Docker (`--loop --interval 600`).
 
 ## Monetization roadmap
 
@@ -173,7 +201,9 @@ See [.env.example](.env.example). Never commit real values.
 | `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather (required for real sends; runtime dry-runs without it) |
 | `TELEGRAM_CHAT_ID` | Fallback chat id for single-chat setups |
 | `GITHUB_TOKEN` | Optional; Bearer auth for the GitHub search API |
-| `OPENAI_API_KEY` | Optional; semantic evaluation (matcher falls back to neutral-50 without it) |
+| `OPENAI_API_KEY` | Optional; legacy single-provider semantic scoring |
+| `TEOS_LLM_PROVIDERS` | Optional; comma-separated free providers for ensemble semantic scoring (`groq`, `openrouter`, `mistral`, `gemini`, `github`, `ollama`) |
+| `{NAME}_BASE_URL` / `{NAME}_API_KEY` / `{NAME}_MODEL` | Per-provider OpenAI-compatible config; sane free-tier defaults exist for known providers; key optional for keyless local (Ollama) |
 | `DATABASE_URL` / `TEOS_TEST_DB` | Application / test database connection strings |
 | `TEOS_LOOP_SECONDS` | `--loop` interval in seconds (default 300) |
 | `TEOS_CONFIDENCE` | Confidence stored with each match result (default 0.9) |

@@ -29,10 +29,12 @@ public sealed class NotificationRuntime
     private readonly string _databaseUrl;
     private readonly string? _telegramBotToken;
     private readonly string? _githubToken;
-    private readonly string? _openAiApiKey;
     private readonly double _confidence;
     private readonly Func<HttpClient> _httpFactory;
     private readonly ITelegramClient? _clientOverride;
+    private readonly ISemanticEvaluator? _semanticEvaluator;
+    private readonly string _semanticMode;
+    private readonly string[] _semanticWarnings;
     private readonly TextWriter _log;
 
     public NotificationRuntime(
@@ -43,16 +45,41 @@ public sealed class NotificationRuntime
         double confidence = 0.9,
         Func<HttpClient>? httpFactory = null,
         ITelegramClient? clientOverride = null,
-        TextWriter? log = null)
+        TextWriter? log = null,
+        IReadOnlyDictionary<string, string>? llmEnv = null)
     {
         _databaseUrl = databaseUrl ?? throw new ArgumentNullException(nameof(databaseUrl));
         _telegramBotToken = telegramBotToken;
         _githubToken = githubToken;
-        _openAiApiKey = openAiApiKey;
         _confidence = confidence;
         _httpFactory = httpFactory ?? (() => new HttpClient());
         _clientOverride = clientOverride;
         _log = log ?? Console.Out;
+
+        var build = BuildSemantic(openAiApiKey, llmEnv, _httpFactory);
+        _semanticEvaluator = build.Evaluator;
+        _semanticMode = build.Mode;
+        _semanticWarnings = build.Warnings ?? Array.Empty<string>();
+    }
+
+    /// <summary>
+    /// Composes the semantic evaluator: environment-configured ensemble first (free providers
+    /// via <c>TEOS_LLM_PROVIDERS</c>), legacy single OpenAI provider when only
+    /// <c>OPENAI_API_KEY</c> is present, or no evaluator (matcher falls back to neutral-50).
+    /// </summary>
+    private static SemanticEvaluatorBuild BuildSemantic(
+        string? legacyOpenAiKey,
+        IReadOnlyDictionary<string, string>? llmEnv,
+        Func<HttpClient> httpFactory)
+    {
+        if (llmEnv is { Count: > 0 })
+            return SemanticProviderFactory.Build(llmEnv, httpFactory);
+
+        if (string.IsNullOrWhiteSpace(legacyOpenAiKey))
+            return new SemanticEvaluatorBuild(null, "neutral-50", Array.Empty<string>());
+
+        var openai = new SemanticProvider("openai", new ChatCompletionsSemanticEvaluator(httpFactory(), legacyOpenAiKey));
+        return new SemanticEvaluatorBuild(new EnsembleSemanticEvaluator(new[] { openai }), "single:openai", Array.Empty<string>());
     }
 
     /// <summary>Builds the runtime from configuration (environment + optional .env).</summary>
@@ -79,13 +106,30 @@ public sealed class NotificationRuntime
             double.TryParse(confidenceRaw, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedConfidence))
             confidence = parsedConfidence;
 
+        // Semantic ensemble config lives in the same environment/.env namespace.
+        var llmEnv = config.AsEnumerable()
+            .Where(kv => !string.IsNullOrWhiteSpace(kv.Value) && IsLlmConfigKey(kv.Key))
+            .GroupBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Last().Value!, StringComparer.OrdinalIgnoreCase);
+
         return new NotificationRuntime(
             databaseUrl: databaseUrl,
             telegramBotToken: Get("TELEGRAM_BOT_TOKEN", "INPUT_TELEGRAM_BOT_TOKEN"),
             githubToken: Get("TEOS_GITHUB_TOKEN", "GITHUB_TOKEN"),
             openAiApiKey: Get("OPENAI_API_KEY"),
             confidence: confidence,
-            log: log);
+            log: log,
+            llmEnv: llmEnv);
+    }
+
+    /// <summary>Keys the semantic provider factory understands (anything provider-shaped).</summary>
+    private static bool IsLlmConfigKey(string key)
+    {
+        var k = key.ToUpperInvariant();
+        return k == "TEOS_LLM_PROVIDERS" || k == "OPENAI_API_KEY" || k == "OPENAI_MODEL"
+               || k.EndsWith("_BASE_URL", StringComparison.Ordinal)
+               || k.EndsWith("_API_KEY", StringComparison.Ordinal)
+               || k.EndsWith("_MODEL", StringComparison.Ordinal);
     }
 
     /// <summary>One full pipeline pass. Never catches exceptions — the caller decides exit codes.</summary>
@@ -132,7 +176,10 @@ public sealed class NotificationRuntime
         }
         _log.WriteLine($"[runtime] opportunities: {fresh} new, {sourceDup} source duplicates, {cross} cross-source candidates");
 
-        // ---- 3. Match (HYBRID_V1; neutral-50 semantic when no OPENAI_API_KEY) -------
+        // ---- 3. Match (HYBRID_V1; ensemble semantic from free providers, neutral-50 fallback) -------
+        _log.WriteLine($"[runtime] semantic evaluator: {_semanticMode}");
+        foreach (var warning in _semanticWarnings)
+            _log.WriteLine($"[runtime] semantic config: {warning}");
         var profiles = await new UserProfileRepository(_databaseUrl).GetAllAsync(ct).ConfigureAwait(false);
         if (profiles.Count == 0)
             _log.WriteLine("[runtime] no user profiles found — skipping matching (seed profiles to enable it)");
@@ -203,12 +250,7 @@ public sealed class NotificationRuntime
         _log.WriteLine("[runtime] loop stopped");
     }
 
-    private ISemanticEvaluator? BuildEvaluator()
-    {
-        if (string.IsNullOrWhiteSpace(_openAiApiKey)) return null; // matcher falls back to neutral-50
-        // Own client: must not share the collector's HttpClient (property mutations after first request throw).
-        return new ChatCompletionsSemanticEvaluator(_httpFactory(), _openAiApiKey);
-    }
+    private ISemanticEvaluator? BuildEvaluator() => _semanticEvaluator;
 
     private ITelegramClient BuildTelegramClient()
     {

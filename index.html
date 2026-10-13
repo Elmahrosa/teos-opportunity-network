@@ -35,6 +35,9 @@
             font-size: 0.9rem;
             margin: 0.5rem 0;
         }
+        ul {
+            padding-left: 1.2rem;
+        }
         .links {
             margin-top: 2rem;
         }
@@ -62,16 +65,30 @@
 <body>
     <div class="container">
         <h1>Teos Opportunity Network</h1>
-        <div class="badge">GitHub Marketplace Action</div>
+        <div class="badge">Deterministic opportunity scanner</div>
         <p>
-            Teos Opportunity Network provides a deterministic GitHub repository valuation engine that scores repositories
-            from 0-100, estimates value ranges, and provides clear decisions and actions. Powered by 8 specialized
-            analysis engines: Core, Deps, CI, Banking, Solana, EVM, TokenIntel, and DueDiligence.
+            Teos Opportunity Network is a deterministic opportunity scanner. It ingests opportunities
+            (currently GitHub bounties), normalizes and deduplicates them by content hash, and scores
+            each one 0&ndash;100 against user profiles using fixed, versioned weights (HYBRID_V1).
+            It alerts via Telegram <strong>only</strong> when a score clears a fixed bar:
+            <strong>&ge;85 = ALERT</strong>, <strong>&ge;90 = APPLY_NOW</strong>. Scores below the bar
+            are logged, never notified.
         </p>
         <p>
-            The valuation action is available on the <a href="https://github.com/marketplace" target="_blank">GitHub Marketplace</a>.
-            Once published, you can use it in your workflows to assess repo health, perform due diligence, or gate merges.
+            The repository also ships a deterministic GitHub repository valuation engine as a
+            GitHub Actions composite action (<a href="https://github.com/Elmahrosa/teos-opportunity-network/blob/master/action.yml" target="_blank">action.yml</a>):
+            it scores a repository 0&ndash;100, estimates a value range, and maps the result to a
+            decision band (ALERT / LOG / IGNORE). It is fully deterministic &mdash; no LLM calls.
         </p>
+        <p>Everything on this page is backed by the codebase and its automated test suite (unit + real-PostgreSQL integration):</p>
+        <ul>
+            <li>Deterministic 0&ndash;100 scoring with fixed thresholds (&ge;85 ALERT, &ge;90 APPLY_NOW).</li>
+            <li>Idempotent deduplication &mdash; re-ingesting the same source record never duplicates it.</li>
+            <li>Snapshot-based replay and audit &mdash; append-only evidence; replay re-uses stored scores and never re-calls the LLM.</li>
+            <li>Telegram delivery with retry/backoff and at most one sent delivery per match.</li>
+            <li>Dry-run mode &mdash; the full pipeline runs end-to-end without a bot token.</li>
+            <li>Telegram bot controls: <code>/start</code>, <code>/pause</code>, <code>/resume</code>.</li>
+        </ul>
         <div class="links">
             <a href="https://github.com/Elmahrosa/teos-opportunity-network" target="_blank">View Source Code</a>
             <a href="https://github.com/Elmahrosa/teos-opportunity-network/releases" target="_blank">Releases</a>

@@ -138,7 +138,7 @@ public sealed class NotificationRuntime
             _log.WriteLine("[runtime] no user profiles found — skipping matching (seed profiles to enable it)");
 
         var matchesRepo = new MatchRepository(_databaseUrl);
-        var matcher = new HybridMatcher(ScoringConfig.CreateHybridV1(), BuildEvaluator(http));
+        var matcher = new HybridMatcher(ScoringConfig.CreateHybridV1(), BuildEvaluator());
         int saved = 0;
         foreach (var opportunity in await oppRepo.GetOpenAsync(ct).ConfigureAwait(false))
         {
@@ -161,7 +161,7 @@ public sealed class NotificationRuntime
 
         // ---- 4. Telegram delivery (dry-run without a token) --------------------------
         var deliveries = new NotificationRepository(_databaseUrl);
-        var client = _clientOverride ?? BuildTelegramClient(http);
+        var client = _clientOverride ?? BuildTelegramClient();
         var worker = new TelegramWorker(matchesRepo, deliveries, client, TelegramBot.ChatResolver(_databaseUrl));
         int sent;
         try
@@ -203,20 +203,23 @@ public sealed class NotificationRuntime
         _log.WriteLine("[runtime] loop stopped");
     }
 
-    private ISemanticEvaluator? BuildEvaluator(HttpClient http)
+    private ISemanticEvaluator? BuildEvaluator()
     {
         if (string.IsNullOrWhiteSpace(_openAiApiKey)) return null; // matcher falls back to neutral-50
-        return new ChatCompletionsSemanticEvaluator(http, _openAiApiKey);
+        // Own client: must not share the collector's HttpClient (property mutations after first request throw).
+        return new ChatCompletionsSemanticEvaluator(_httpFactory(), _openAiApiKey);
     }
 
-    private ITelegramClient BuildTelegramClient(HttpClient http)
+    private ITelegramClient BuildTelegramClient()
     {
         if (string.IsNullOrWhiteSpace(_telegramBotToken))
         {
             _log.WriteLine("[runtime] TELEGRAM_BOT_TOKEN not set — running in DRY-RUN mode (no real sends)");
             return new TelegramDryRunClient(_log);
         }
-        return new TelegramBotClient(http, _telegramBotToken);
+        _log.WriteLine("[runtime] Telegram client: REAL (token configured — never logged)");
+        // Own client: TelegramBotClient adjusts Timeout, which throws if the HttpClient already sent a request.
+        return new TelegramBotClient(_httpFactory(), _telegramBotToken);
     }
 
     internal static string Sanitize(string message) => TelegramBotClient.Redact(message);

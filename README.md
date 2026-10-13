@@ -14,6 +14,25 @@ Discover opportunities
 → Notify users
 ```
 
+## Use the GitHub Action
+
+This repository ships a composite GitHub Action — **TEOS Sovereign Repo Valuation** (see [`action.yml`](action.yml)) — that scores a repository **0–100** and estimates a value range. Deterministic; no LLM.
+
+```yaml
+# .github/workflows/valuations.yml
+- uses: Elmahrosa/teos-opportunity-network@v1.1.1
+  with:
+    github-token: ${{ github.token }}
+```
+
+| Output | Description |
+|---|---|
+| `score` | TEOS Score 0–100 |
+| `valuation` | Estimated range |
+| `decision` | ALERT / LOG / IGNORE |
+
+The rest of this README documents the opportunity-network runtime (scanner + Telegram bot).
+
 ## Opportunity types
 
 `JOB` · `PROJECT` · `BOUNTY` · `HACKATHON` · `SOFTWARE` · `SERVICE`
@@ -113,7 +132,19 @@ Telegram is a notification/UI layer only.
 - **`TelegramBotClient`**: transport-only adapter. Reads `TELEGRAM_BOT_TOKEN` from the environment; missing token fails fast with a secret-free error. 429 honors `retry_after`; timeouts/5xx retry; 4xx are permanent. All error text passes a token redaction filter.
 - **Delivery guarantee**: at most one `SENT` row per `(match_id, user_id, channel)` enforced by a partial unique index plus an `already_alerted` double-check. Exactly-once cannot be guaranteed across a crash between provider accept and `mark_sent`; application-level idempotency is what is guaranteed.
 
-Bot commands (only what the profile model supports): `/start`, `/pause`, `/resume`.
+Bot commands (only what the profile model supports — implemented and tested): `/start`, `/pause`, `/resume`, `/help`, `/status`. `/status` reports the linked profile, notification state, and how many alerts were actually delivered (SENT) in the last 7 days.
+
+## Monetization roadmap
+
+The project is currently **open and free**; the tiers below are a proposal, not live billing. Nothing is for sale yet.
+
+| Plan | Status | Includes |
+|---|---|---|
+| **Open** (free) | Available now | Self-hosted `--once` / `--loop` scanner, one profile, GitHub source, neutral semantic scoring, the repo valuation Action |
+| **Pro — Hosted alerts** | Planned — not billable | Managed scan loop, LLM semantic scoring on a managed key, multiple profiles, priority Telegram delivery (proposed subscription) |
+| **Network — API** | Planned — not billable | Matched-opportunity API feed, custom sources, replay/benchmark reports (proposed data/API tier) |
+
+Revenue path: the free Open tier builds adoption (GitHub Marketplace Action + scanner); the paid tiers monetize the parts that actually cost money to operate — hosted scanning, managed semantic scoring, multi-profile coordination, and API/data access.
 
 ## Database setup
 

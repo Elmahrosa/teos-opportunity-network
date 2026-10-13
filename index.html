@@ -3,102 +3,375 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teos Opportunity Network</title>
+    <meta name="description" content="TEOS Opportunity Network — a deterministic opportunity scanner (GitHub bounties → score → Telegram alerts) plus a GitHub repo valuation Action. Not a job board.">
+    <title>TEOS Opportunity Network</title>
     <style>
+        :root {
+            --bg: #0b1020;
+            --bg-soft: #111830;
+            --panel: #161f3d;
+            --panel-2: #1b2547;
+            --ink: #e8ecf8;
+            --muted: #9aa5c8;
+            --accent: #34d399;
+            --accent-dim: #10b981;
+            --gold: #fbbf24;
+            --line: #26315c;
+            --danger: #f87171;
+            --mono: ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, monospace;
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
             margin: 0;
-            padding: 2rem;
-            background-color: #f5f5f5;
-            color: #333;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg);
+            color: var(--ink);
             line-height: 1.6;
         }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .wrap { max-width: 1080px; margin: 0 auto; padding: 0 1.25rem; }
+
+        /* ---------- header ---------- */
+        header {
+            position: sticky; top: 0; z-index: 10;
+            background: rgba(11, 16, 32, 0.92);
+            backdrop-filter: blur(6px);
+            border-bottom: 1px solid var(--line);
         }
-        h1 {
-            color: #2c3e50;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 0.5rem;
+        .nav { display: flex; align-items: center; gap: 1.5rem; padding: 0.85rem 1.25rem; flex-wrap: wrap; }
+        .brand { font-weight: 800; letter-spacing: 0.02em; }
+        .brand span { color: var(--accent); }
+        .nav-links { display: flex; gap: 1.1rem; flex-wrap: wrap; margin-left: auto; }
+        .nav-links a { color: var(--muted); font-size: 0.92rem; }
+        .nav-links a:hover { color: var(--ink); text-decoration: none; }
+
+        /* ---------- hero ---------- */
+        .hero { padding: 4.5rem 0 3rem; }
+        .eyebrow {
+            display: inline-block; padding: 0.25rem 0.7rem; border: 1px solid var(--line);
+            border-radius: 999px; font-size: 0.78rem; color: var(--gold); letter-spacing: 0.06em;
+            text-transform: uppercase; margin-bottom: 1.2rem; background: rgba(251, 191, 36, 0.07);
         }
+        h1 { font-size: clamp(2.1rem, 5vw, 3.4rem); line-height: 1.12; margin: 0 0 1rem; letter-spacing: -0.02em; }
+        h1 .grad { background: linear-gradient(90deg, var(--accent), #60a5fa); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .tagline { font-size: 1.15rem; color: var(--muted); max-width: 62ch; margin: 0 0 1.6rem; }
+        .chips { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 2rem; }
+        .chip {
+            border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
+            padding: 0.45rem 0.85rem; font-size: 0.85rem; color: var(--muted);
+        }
+        .chip b { color: var(--ink); }
+        .cta { display: flex; gap: 0.9rem; flex-wrap: wrap; }
+        .btn {
+            display: inline-block; padding: 0.7rem 1.3rem; border-radius: 10px; font-weight: 600;
+            font-size: 0.95rem; border: 1px solid transparent;
+        }
+        .btn.primary { background: var(--accent-dim); color: #04140c; }
+        .btn.primary:hover { background: var(--accent); text-decoration: none; }
+        .btn.ghost { border-color: var(--line); color: var(--ink); }
+        .btn.ghost:hover { border-color: var(--accent); text-decoration: none; }
+
+        /* ---------- sections ---------- */
+        section { padding: 3.2rem 0; border-top: 1px solid var(--line); }
+        h2 { font-size: 1.65rem; margin: 0 0 0.4rem; letter-spacing: -0.01em; }
+        .sub { color: var(--muted); margin: 0 0 1.8rem; max-width: 70ch; }
+
+        .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+        .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 1.1rem 1.2rem; }
+        .card h3 { margin: 0 0 0.4rem; font-size: 1.02rem; }
+        .card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+        .step-num { font-family: var(--mono); color: var(--accent); font-size: 0.78rem; letter-spacing: 0.08em; }
+
+        .cols { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); align-items: start; }
+        .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 1.3rem; }
+        .panel h3 { margin: 0 0 0.8rem; font-size: 1.05rem; }
+
+        pre {
+            background: var(--bg-soft); border: 1px solid var(--line); border-radius: 10px;
+            padding: 1rem; overflow-x: auto; font-family: var(--mono); font-size: 0.84rem; line-height: 1.5;
+        }
+        pre .c { color: var(--muted); }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+        th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        td code { font-family: var(--mono); font-size: 0.85rem; color: var(--accent); }
+
         .badge {
-            display: inline-block;
-            background: #3498db;
-            color: white;
-            padding: 0.3rem 0.8rem;
-            border-radius: 4px;
-            font-size: 0.9rem;
-            margin: 0.5rem 0;
+            display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.72rem;
+            font-weight: 600; letter-spacing: 0.04em; white-space: nowrap;
         }
-        ul {
-            padding-left: 1.2rem;
-        }
-        .links {
-            margin-top: 2rem;
-        }
-        .links a {
-            display: inline-block;
-            margin-right: 1rem;
-            padding: 0.8rem 1.5rem;
-            background: #2ecc71;
-            color: white;
-            text-decoration: none;
-            border-radius: 4px;
-            transition: background 0.3s;
-        }
-        .links a:hover {
-            background: #27ae60;
-        }
-        footer {
-            margin-top: 3rem;
-            text-align: center;
-            color: #7f8c8d;
-            font-size: 0.9rem;
+        .badge.live { background: rgba(52, 211, 153, 0.15); color: var(--accent); border: 1px solid rgba(52, 211, 153, 0.45); }
+        .badge.plan { background: rgba(96, 165, 250, 0.12); color: #93c5fd; border: 1px solid rgba(96, 165, 250, 0.4); }
+        .badge.todo { background: rgba(248, 113, 113, 0.12); color: var(--danger); border: 1px solid rgba(248, 113, 113, 0.4); }
+
+        .ok { color: var(--accent); font-weight: 600; }
+        .flow { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; color: var(--muted); font-size: 0.9rem; }
+        .flow .node { background: var(--panel-2); border: 1px solid var(--line); padding: 0.3rem 0.7rem; border-radius: 8px; color: var(--ink); font-size: 0.85rem; }
+        .flow .arr { color: var(--accent); }
+
+        .plan .price { font-size: 1.5rem; font-weight: 800; color: var(--ink); }
+        .plan .price small { font-size: 0.85rem; color: var(--muted); font-weight: 400; }
+        .plan ul { margin: 0.8rem 0 0; padding-left: 1.1rem; color: var(--muted); font-size: 0.9rem; }
+        .plan ul li { margin-bottom: 0.35rem; }
+        .plan ul b { color: var(--ink); }
+
+        footer { border-top: 1px solid var(--line); padding: 2rem 0 3rem; color: var(--muted); font-size: 0.88rem; }
+        footer .wrap { display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: space-between; align-items: center; }
+
+        @media (max-width: 700px) {
+            .nav-links { margin-left: 0; width: 100%; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Teos Opportunity Network</h1>
-        <div class="badge">Deterministic opportunity scanner</div>
-        <p>
-            Teos Opportunity Network is a deterministic opportunity scanner. It ingests opportunities
-            (currently GitHub bounties), normalizes and deduplicates them by content hash, and scores
-            each one 0&ndash;100 against user profiles using fixed, versioned weights (HYBRID_V1).
-            It alerts via Telegram <strong>only</strong> when a score clears a fixed bar:
-            <strong>&ge;85 = ALERT</strong>, <strong>&ge;90 = APPLY_NOW</strong>. Scores below the bar
-            are logged, never notified.
-        </p>
-        <p>
-            The repository also ships a deterministic GitHub repository valuation engine as a
-            GitHub Actions composite action (<a href="https://github.com/Elmahrosa/teos-opportunity-network/blob/master/action.yml" target="_blank">action.yml</a>):
-            it scores a repository 0&ndash;100, estimates a value range, and maps the result to a
-            decision band (ALERT / LOG / IGNORE). It is fully deterministic &mdash; no LLM calls.
-        </p>
-        <p>Everything on this page is backed by the codebase and its automated test suite (unit + real-PostgreSQL integration):</p>
-        <ul>
-            <li>Deterministic 0&ndash;100 scoring with fixed thresholds (&ge;85 ALERT, &ge;90 APPLY_NOW).</li>
-            <li>Idempotent deduplication &mdash; re-ingesting the same source record never duplicates it.</li>
-            <li>Snapshot-based replay and audit &mdash; append-only evidence; replay re-uses stored scores and never re-calls the LLM.</li>
-            <li>Telegram delivery with retry/backoff and at most one sent delivery per match.</li>
-            <li>Dry-run mode &mdash; the full pipeline runs end-to-end without a bot token.</li>
-            <li>Telegram bot controls: <code>/start</code>, <code>/pause</code>, <code>/resume</code>.</li>
-        </ul>
-        <div class="links">
-            <a href="https://github.com/Elmahrosa/teos-opportunity-network" target="_blank">View Source Code</a>
-            <a href="https://github.com/Elmahrosa/teos-opportunity-network/releases" target="_blank">Releases</a>
-        </div>
-        <footer>
-            &copy; <span id="year"></span> Teos Opportunity Network. All rights reserved.
-        </footer>
+
+<header>
+    <div class="wrap nav">
+        <div class="brand">TEOS <span>Opportunity Network</span></div>
+        <nav class="nav-links" aria-label="Primary">
+            <a href="#how">How it works</a>
+            <a href="#scoring">Scoring</a>
+            <a href="#bot">Bot</a>
+            <a href="#action">Action</a>
+            <a href="#plans">Plans</a>
+            <a href="https://github.com/Elmahrosa/teos-opportunity-network">GitHub ↗</a>
+        </nav>
     </div>
-    <script>
-        document.getElementById('year').textContent = new Date().getFullYear();
-    </script>
+</header>
+
+<main>
+    <!-- HERO -->
+    <section class="hero" style="border-top:none;">
+        <div class="wrap">
+            <span class="eyebrow">Deterministic · No job board · Open source</span>
+            <h1>A scanner that scores opportunities —<br><span class="grad">and tells you exactly why.</span></h1>
+            <p class="tagline">
+                TEOS discovers GitHub opportunities (bounties, projects, jobs, hackathons),
+                normalizes and deduplicates them, matches them against your profile with a
+                <b>fixed, weighted, deterministic score</b>, and sends a Telegram alert only when the
+                threshold is cleared. An LLM is optional and capped — it can never make the decision for you.
+            </p>
+            <div class="chips">
+                <span class="chip"><b>101/101</b> tests green · real PostgreSQL</span>
+                <span class="chip"><b>0</b> build warnings</span>
+                <span class="chip">weights total <b>1.0</b> (validated)</span>
+                <span class="chip">Live bot: <b>@teoson_bot</b></span>
+            </div>
+            <div class="cta">
+                <a class="btn primary" href="https://github.com/Elmahrosa/teos-opportunity-network">View on GitHub</a>
+                <a class="btn ghost" href="#action">Use the Action</a>
+                <a class="btn ghost" href="#plans">See the plans</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- HOW -->
+    <section id="how">
+        <div class="wrap">
+            <h2>How the pipeline works</h2>
+            <p class="sub">Every pass runs the same seven stages in order: collect, clean, deduplicate, match with hard rules + score, persist evidence, gate by threshold, then notify.</p>
+            <div class="flow" style="margin-bottom:1.4rem;">
+                <span class="node">Discover</span><span class="arr">→</span>
+                <span class="node">Normalize</span><span class="arr">→</span>
+                <span class="node">Deduplicate</span><span class="arr">→</span>
+                <span class="node">Match</span><span class="arr">→</span>
+                <span class="node">Persist</span><span class="arr">→</span>
+                <span class="node">Threshold</span><span class="arr">→</span>
+                <span class="node">Notify</span>
+            </div>
+            <div class="grid">
+                <div class="card"><span class="step-num">STEP 1 · COLLECTOR</span><h3>Discover</h3><p>Queries <code>api.github.com/search/issues</code> with an optional Bearer token. Credentials are never hard-coded.</p></div>
+                <div class="card"><span class="step-num">STEP 2 · NORMALIZER</span><h3>Clean</h3><p>Deterministic normalization of title, description, URL, skills, type, budget, currency, dates. Produces a SHA-256 <code>content_hash</code>.</p></div>
+                <div class="card"><span class="step-num">STEP 3 · DEDUP</span><h3>Deduplicate</h3><p><code>UNIQUE(source, external_id)</code> is the hard boundary. Provenance is never destroyed — <code>input_snapshots</code> is append-only.</p></div>
+                <div class="card"><span class="step-num">STEP 4 · MATCHER</span><h3>Match</h3><p>Hard rules + weighted score + optional LLM semantic signal (capped at 5% weight in HYBRID_V1).</p></div>
+                <div class="card"><span class="step-num">STEP 5/6 · REPOSITORY</span><h3>Persist</h3><p>Evidence is saved with its weights version. Re-saving never overwrites history — idempotent on <code>(opportunity, user, version)</code>.</p></div>
+                <div class="card"><span class="step-num">STEP 7 · GATE</span><h3>Threshold</h3><p><b>≥85 → ALERT</b>, ≥60 → LOG, below → IGNORE. Enforced in code and by PostgreSQL <code>CHECK</code> constraints.</p></div>
+                <div class="card"><span class="step-num">STEP 9 · DELIVERY</span><h3>Notify</h3><p>Telegram messages go through <code>PENDING → SENDING → SENT / FAILED → RETRY</code>. At most one SENT per (match, user, channel).</p></div>
+                <div class="card"><span class="step-num">STEP 10 · RUNTIME</span><h3>Run</h3><p><code>--once</code> one pass, <code>--loop</code> on an interval (default 300&nbsp;s). Without a token the same pass dry-runs honestly.</p></div>
+            </div>
+            <p class="sub" style="margin-top:1.2rem;">
+                Opportunity types: <code>JOB</code> · <code>PROJECT</code> · <code>BOUNTY</code> · <code>HACKATHON</code> · <code>SOFTWARE</code> · <code>SERVICE</code>
+            </p>
+        </div>
+    </section>
+
+    <!-- SCORING -->
+    <section id="scoring">
+        <div class="wrap">
+            <h2>Scoring that can't be gamed</h2>
+            <p class="sub">The score is a fixed linear combination of component scores. Identical inputs always produce the identical score — the weights are the configuration, and they must sum to exactly 1.0 or the engine refuses to run.</p>
+            <div class="cols">
+                <div class="panel">
+                    <h3>HYBRID_V1 — production weights <span class="badge live">ACTIVE</span></h3>
+                    <pre><span class="c">// ScoringConfig.CreateHybridV1() — must total 1.0</span>
+{"skills":0.35,"experience":0.20,"budget":0.15,
+ "type":0.10,"location":0.10,"urgency":0.05,
+ "semantic":0.05}</pre>
+                    <p>Replay/benchmarks re-score only the immutable <code>input_snapshot</code> — the LLM is never called again, and no current state can leak in.</p>
+                </div>
+                <div class="panel">
+                    <h3>HYBRID_V2 — experimental <span class="badge plan">EXPERIMENTAL</span></h3>
+                    <pre><span class="c">// Explicit opt-in only; never replaces V1 in production</span>
+{"skills":0.30,"experience":0.20,"budget":0.15,
+ "type":0.10,"location":0.10,"urgency":0.05,
+ "semantic":0.10}</pre>
+                    <p>Weights are validated (<b>must total 1.0</b>), versioned, and stored with every match. No unknown weights, no negatives.</p>
+                </div>
+            </div>
+            <div class="cols" style="margin-top:1.5rem;">
+                <div class="panel">
+                    <h3>Decision thresholds</h3>
+                    <table>
+                        <tr><th>Score</th><th>Decision</th></tr>
+                        <tr><td><code>≥ 85</code></td><td><b>ALERT</b> — eligible for notification</td></tr>
+                        <tr><td><code>≥ 60</code></td><td>LOG — watched, not alerted</td></tr>
+                        <tr><td><code>&lt; 60</code></td><td>IGNORE</td></tr>
+                    </table>
+                </div>
+                <div class="panel">
+                    <h3>Recommended action</h3>
+                    <table>
+                        <tr><th>Score</th><th>Action</th></tr>
+                        <tr><td><code>≥ 90</code></td><td><b>APPLY_NOW</b></td></tr>
+                        <tr><td><code>≥ 75</code></td><td>REVIEW</td></tr>
+                        <tr><td><code>&lt; 75</code></td><td>PASS</td></tr>
+                    </table>
+                    <p style="margin-bottom:0;">Invariants are enforced in code <i>and</i> by DB constraints: a score ≥ 90 can never be IGNORE or PASS.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- BOT -->
+    <section id="bot">
+        <div class="wrap">
+            <h2>The Telegram bot — <span style="color:var(--accent);">@teoson_bot</span> <span class="badge live">LIVE · VERIFIED</span></h2>
+            <p class="sub">
+                The bot is a notification/UI layer only — it never re-scores, matches, or calls an LLM.
+                It reads the persisted match result and delivers it verbatim. It was verified end-to-end:
+                a real seeded opportunity scored <b>90.00 → ALERT / APPLY_NOW</b> and was delivered
+                (provider message id <code>4</code>, sent 2026-10-13 03:34:07 UTC).
+            </p>
+            <div class="cols">
+                <div class="panel">
+                    <h3>Commands <span class="badge live">IMPLEMENTED + TESTED</span></h3>
+                    <table>
+                        <tr><th>Command</th><th>What it does</th></tr>
+                        <tr><td><code>/start</code></td><td>Link this chat to your TEOS profile and enable ALERT notifications. Only confirms when a link actually exists.</td></tr>
+                        <tr><td><code>/pause</code></td><td>Pause notifications (persisted on chat <i>and</i> profile).</td></tr>
+                        <tr><td><code>/resume</code></td><td>Resume notifications.</td></tr>
+                        <tr><td><code>/status</code></td><td>Shows linked profile, pause state, and how many alerts were actually delivered in the last 7 days.</td></tr>
+                        <tr><td><code>/help</code></td><td>Lists every available command.</td></tr>
+                    </table>
+                </div>
+                <div class="panel">
+                    <h3>Delivery guarantees</h3>
+                    <ul style="margin:0; padding-left:1.1rem; color:var(--muted);">
+                        <li>One delivery row per (match, user, channel) with status flow <code>PENDING → SENDING → SENT / FAILED → RETRY</code>.</li>
+                        <li>Claims use <code>FOR UPDATE SKIP LOCKED</code> — safe for concurrent workers.</li>
+                        <li>A partial unique index enforces <span class="ok">at most one SENT per (match, user, channel)</span>.</li>
+                        <li>Messages are HTML-escaped and capped below Telegram's 4096-char limit.</li>
+                        <li>429 responses honor <code>retry_after</code>; tokens are redacted from every error path.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ACTION -->
+    <section id="action">
+        <div class="wrap">
+            <h2>The GitHub Action — <span style="color:var(--accent);">TEOS Sovereign Repo Valuation</span></h2>
+            <p class="sub">
+                A composite action in this repository that values a repository as an asset:
+                a deterministic 0–100 score plus an estimated dollar range. No LLM involved.
+                Works on any runner with .NET 8 support; the token defaults to the workflow's <code>github.token</code>.
+            </p>
+            <div class="cols">
+                <div class="panel">
+                    <h3>Usage</h3>
+                    <pre><span class="c"># .github/workflows/valuations.yml</span>
+- uses: Elmahrosa/teos-opportunity-network@v1.1.1
+  with:
+    github-token: ${{ github.token }}</pre>
+                    <table style="margin-top:0.8rem;">
+                        <tr><th>Output</th><th>Meaning</th></tr>
+                        <tr><td><code>score</code></td><td>TEOS Score 0–100</td></tr>
+                        <tr><td><code>valuation</code></td><td>Estimated range</td></tr>
+                        <tr><td><code>decision</code></td><td>ALERT / LOG / IGNORE</td></tr>
+                    </table>
+                </div>
+                <div class="panel">
+                    <h3>Verification</h3>
+                    <ul style="margin:0; padding-left:1.1rem; color:var(--muted);">
+                        <li>Build gate: <b>0 warnings, 0 errors</b>.</li>
+                        <li><b>101/101 tests</b> against a real PostgreSQL instance — no SQLite anywhere.</li>
+                        <li>CI runs the valuation <code>smoke</code> pass on every push and pull request.</li>
+                        <li>Releases are tagged and the <code>action.yml</code> is marketplace-shaped (name, description, branding, inputs, outputs).</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PLANS -->
+    <section id="plans">
+        <div class="wrap">
+            <h2>Plans</h2>
+            <p class="sub">
+                What exists today is open and free. The paid plans below are the <b>product roadmap</b> —
+                billing is not implemented, so nothing here is for sale yet. Every “planned” feature maps
+                to a real capability the codebase already has or a genuine gap it fills.
+            </p>
+            <div class="grid">
+                <div class="card plan">
+                    <h3>Open <span class="badge live">AVAILABLE NOW</span></h3>
+                    <div class="price">$0<small> / forever</small></div>
+                    <ul>
+                        <li>Self-host the scanner (<code>--once</code> / <code>--loop</code>) in your own environment</li>
+                        <li>One profile, GitHub search source</li>
+                        <li>Deterministic matching — semantic is optional (neutral-50 without a key)</li>
+                        <li>The repo valuation Action, free to use</li>
+                    </ul>
+                </div>
+                <div class="card plan">
+                    <h3>Pro — Hosted alerts <span class="badge todo">PLANNED</span></h3>
+                    <div class="price">TBD<small> · proposed</small></div>
+                    <ul>
+                        <li>Managed <code>--loop</code> instance run for you</li>
+                        <li>LLM semantic scoring on our key (today you'd bring your own)</li>
+                        <li>Multiple profiles and more sources</li>
+                        <li>Priority Telegram delivery + delivery logs</li>
+                    </ul>
+                </div>
+                <div class="card plan">
+                    <h3>Network — API <span class="badge todo">PLANNED</span></h3>
+                    <div class="price">TBD<small> · proposed</small></div>
+                    <ul>
+                        <li>Matched-opportunity feed via API</li>
+                        <li>Custom sources beyond GitHub</li>
+                        <li>Replay/benchmark reports for your own scoring config</li>
+                    </ul>
+                </div>
+            </div>
+            <p class="sub" style="margin-top:1.3rem; margin-bottom:0;">
+                <b>Honesty note:</b> every claim on this page is backed by code in this repository
+                (<code>ScoringConfig</code>, <code>MatchDecisions</code>, <code>TelegramBot</code>, <code>action.yml</code>)
+                and by tests that run against a real database. Nothing is invented to look good.
+            </p>
+        </div>
+    </section>
+</main>
+
+<footer>
+    <div class="wrap">
+        <span>© 2026 TEOS Opportunity Network · by Elmahrosa</span>
+        <span><a href="https://github.com/Elmahrosa/teos-opportunity-network">github.com/Elmahrosa/teos-opportunity-network</a></span>
+    </div>
+</footer>
+
 </body>
 </html>

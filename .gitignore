@@ -35,3 +35,6 @@ temp/
 # OS
 Thumbs.db
 .DS_Store
+
+# Vercel CLI local state
+.vercel

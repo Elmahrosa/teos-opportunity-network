@@ -4,6 +4,7 @@ using Teos.OpportunityNetwork.Runner;
 //   --valuation  repo valuation CLI (legacy: `smoke`)
 //   --once       one notification pipeline pass (ingest → match → persist → deliver)
 //   --loop       notification pipeline on an interval until Ctrl+C
+//   --migrate    idempotently apply migrations/0001_init.sql to DATABASE_URL
 //   --help       usage
 // The notification composition root lives in NotificationRuntime (see BoundaryTests:
 // the Runner orchestrates; scoring/normalization/dedup logic stays in its owning library).
@@ -35,6 +36,9 @@ switch (mode.Kind)
 
     case RunnerModeKind.Loop:
         return await NotificationCli.RunLoopAsync(mode.LoopInterval);
+
+    case RunnerModeKind.Migrate:
+        return await MigrationCli.RunMigrateAsync();
 
     default:
         Console.Error.WriteLine("error: unreachable mode.");

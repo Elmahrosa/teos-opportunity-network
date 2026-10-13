@@ -35,6 +35,7 @@ public sealed class NotificationRuntime
     private readonly ISemanticEvaluator? _semanticEvaluator;
     private readonly string _semanticMode;
     private readonly string[] _semanticWarnings;
+    private readonly string[] _redactionSecrets;
     private readonly TextWriter _log;
 
     public NotificationRuntime(
@@ -60,6 +61,13 @@ public sealed class NotificationRuntime
         _semanticEvaluator = build.Evaluator;
         _semanticMode = build.Mode;
         _semanticWarnings = build.Warnings ?? Array.Empty<string>();
+
+        var seeds = new List<string?> { databaseUrl, telegramBotToken, githubToken };
+        if (llmEnv is not null)
+            seeds.AddRange(llmEnv
+                .Where(kv => kv.Key.EndsWith("_API_KEY", StringComparison.OrdinalIgnoreCase))
+                .Select(kv => kv.Value));
+        _redactionSecrets = seeds.Where(s => !string.IsNullOrWhiteSpace(s)).Cast<string>().ToArray();
     }
 
     /// <summary>
@@ -264,5 +272,11 @@ public sealed class NotificationRuntime
         return new TelegramBotClient(_httpFactory(), _telegramBotToken);
     }
 
-    internal static string Sanitize(string message) => TelegramBotClient.Redact(message);
+    /// <summary>
+    /// Redacts every configured secret (DB connection string, Telegram token, provider keys)
+    /// from a message before it is logged or rethrown. <see cref="SecretRedactor"/> also
+    /// strips Npgsql Password= segments, which the full connection-string redaction alone
+    /// would miss.
+    /// </summary>
+    private string Sanitize(string message) => SecretRedactor.RedactSecrets(message, _redactionSecrets);
 }

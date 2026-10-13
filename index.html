@@ -155,7 +155,7 @@
                 threshold is cleared. An LLM is optional and capped — it can never make the decision for you.
             </p>
             <div class="chips">
-                <span class="chip"><b>101/101</b> tests green · real PostgreSQL</span>
+                <span class="chip"><b>126/126</b> tests green · real PostgreSQL</span>
                 <span class="chip"><b>0</b> build warnings</span>
                 <span class="chip">weights total <b>1.0</b> (validated)</span>
                 <span class="chip">Live bot: <b>@teoson_bot</b></span>
@@ -190,7 +190,7 @@
                 <div class="card"><span class="step-num">STEP 5/6 · REPOSITORY</span><h3>Persist</h3><p>Evidence is saved with its weights version. Re-saving never overwrites history — idempotent on <code>(opportunity, user, version)</code>.</p></div>
                 <div class="card"><span class="step-num">STEP 7 · GATE</span><h3>Threshold</h3><p><b>≥85 → ALERT</b>, ≥60 → LOG, below → IGNORE. Enforced in code and by PostgreSQL <code>CHECK</code> constraints.</p></div>
                 <div class="card"><span class="step-num">STEP 9 · DELIVERY</span><h3>Notify</h3><p>Telegram messages go through <code>PENDING → SENDING → SENT / FAILED → RETRY</code>. At most one SENT per (match, user, channel).</p></div>
-                <div class="card"><span class="step-num">STEP 10 · RUNTIME</span><h3>Run</h3><p><code>--once</code> one pass, <code>--loop</code> on an interval (default 300&nbsp;s), or a free scheduled GitHub Actions scanner every 30&nbsp;min. Without a token the same pass dry-runs honestly.</p></div>
+                <div class="card"><span class="step-num">STEP 10 · RUNTIME</span><h3>Run</h3><p><code>--once</code> one pass, <code>--loop</code> on an interval (default 300&nbsp;s), or a free scheduled GitHub Actions scanner hourly. Without a token the same pass dry-runs honestly.</p></div>
             </div>
             <p class="sub" style="margin-top:1.2rem;">
                 Opportunity types: <code>JOB</code> · <code>PROJECT</code> · <code>BOUNTY</code> · <code>HACKATHON</code> · <code>SOFTWARE</code> · <code>SERVICE</code>
@@ -292,7 +292,9 @@
         <div class="wrap">
             <h2>The GitHub Action — <span style="color:var(--accent);">TEOS Sovereign Repo Valuation</span></h2>
             <p class="sub">
-                A composite action in this repository that values a repository as an asset:
+                A composite action in its own repository —
+                <a href="https://github.com/Elmahrosa/teos-repo-valuation">Elmahrosa/teos-repo-valuation</a> —
+                that values a repository as an asset:
                 a deterministic 0–100 score plus an estimated dollar range. No LLM involved.
                 Works on any runner with .NET 8 support; the token defaults to the workflow's <code>github.token</code>.
             </p>
@@ -300,7 +302,7 @@
                 <div class="panel">
                     <h3>Usage</h3>
                     <pre><span class="c"># .github/workflows/valuations.yml</span>
-- uses: Elmahrosa/teos-opportunity-network@v1.1.1
+- uses: Elmahrosa/teos-repo-valuation@v1.2.1
   with:
     github-token: ${{ github.token }}</pre>
                     <table style="margin-top:0.8rem;">
@@ -314,7 +316,7 @@
                     <h3>Verification</h3>
                     <ul style="margin:0; padding-left:1.1rem; color:var(--muted);">
                         <li>Build gate: <b>0 warnings, 0 errors</b>.</li>
-                        <li><b>101/101 tests</b> against a real PostgreSQL instance — no SQLite anywhere.</li>
+                        <li><b>126/126 tests</b> against a real PostgreSQL instance — no SQLite anywhere.</li>
                         <li>CI runs the valuation <code>smoke</code> pass on every push and pull request.</li>
                         <li>Releases are tagged and the <code>action.yml</code> is marketplace-shaped (name, description, branding, inputs, outputs).</li>
                     </ul>

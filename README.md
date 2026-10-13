@@ -2,6 +2,8 @@
 
 **by Elmahrosa**
 
+[![Marketplace](https://img.shields.io/badge/Marketplace-TEOS%20Sovereign%20Repo%20Valuation-blue?logo=github)](https://github.com/marketplace/actions/teos-sovereign-repo-valuation)
+
 A deterministic opportunity scanner (`--once` / `--loop`) with a GitHub repo valuation action. Scores 0–100 with fixed thresholds (≥85 ALERT, ≥90 APPLY_NOW) and alerts via Telegram only when the bar is cleared. Matching is deterministic; an optional LLM semantic signal is capped at its configured weight and falls back to neutral-50 without an API key. Not a traditional job board.
 
 ```text

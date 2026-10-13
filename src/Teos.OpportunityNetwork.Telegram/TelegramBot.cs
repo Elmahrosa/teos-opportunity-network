@@ -4,12 +4,21 @@ using Teos.OpportunityNetwork.Persistence;
 namespace Teos.OpportunityNetwork.Telegram;
 
 /// <summary>
-/// Minimal bot surface: registers chats (/start) and reads/pauses the persisted
-/// notification preference (/pause, /resume). Only commands that fit the actual
-/// user/profile model are implemented — no invented functionality.
+/// Minimal bot surface: registers chats (/start), reads/pauses the persisted
+/// notification preference (/pause, /resume), and reports per-chat state (/status).
+/// /help lists every command. Only commands that fit the actual user/profile model
+/// are implemented — no invented functionality.
 /// </summary>
 public sealed class TelegramBot
 {
+    private static readonly string HelpText =
+        "<b>Available commands</b>\n" +
+        "/start – link this chat to your TEOS profile and enable ALERT notifications\n" +
+        "/pause – pause notifications\n" +
+        "/resume – resume notifications\n" +
+        "/status – link state and alerts delivered recently\n" +
+        "/help – this message";
+
     private readonly string _conn;
     private readonly ITelegramClient _client;
 
@@ -46,9 +55,17 @@ public sealed class TelegramBot
                 await _client.SendAsync(chatId.ToString(), "Notifications resumed.", ct).ConfigureAwait(false);
                 break;
 
+            case "/help":
+                await _client.SendAsync(chatId.ToString(), HelpText, ct).ConfigureAwait(false);
+                break;
+
+            case "/status":
+                await SendStatusAsync(chatId, ct).ConfigureAwait(false);
+                break;
+
             default:
                 await _client.SendAsync(chatId.ToString(),
-                    "Available commands: /start, /pause, /resume", ct).ConfigureAwait(false);
+                    "Unknown command. Send /help to list available commands.", ct).ConfigureAwait(false);
                 break;
         }
     }
@@ -93,6 +110,64 @@ public sealed class TelegramBot
         await profile.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         await tx.CommitAsync(ct).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Reports persisted per-chat state: linked profile, paused flag, and how many
+    /// ALERT notifications were actually delivered (SENT) in the last 7 days.
+    /// Never invents a score or re-evaluates a match — reads deliveries only.
+    /// </summary>
+    private async Task SendStatusAsync(long chatId, CancellationToken ct)
+    {
+        await using var conn = new NpgsqlConnection(_conn);
+        await conn.OpenAsync(ct).ConfigureAwait(false);
+
+        Guid? userId = null;
+        string? displayName = null;
+        var paused = false;
+
+        await using (var cmd = new NpgsqlCommand(@"
+            SELECT u.id, u.display_name, u.notifications_paused, t.paused
+            FROM telegram_chats t
+            JOIN user_profiles u ON u.id = t.user_id
+            WHERE t.chat_id = @c", conn))
+        {
+            cmd.Parameters.AddWithValue("@c", chatId.ToString());
+            await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            if (await reader.ReadAsync(ct).ConfigureAwait(false))
+            {
+                userId = reader.GetGuid(0);
+                displayName = reader.GetString(1);
+                paused = reader.GetBoolean(2) || reader.GetBoolean(3);
+            }
+        }
+
+        if (userId is null)
+        {
+            await _client.SendAsync(chatId.ToString(),
+                "This chat is not linked to a TEOS profile yet. Send /start to link it and enable ALERT notifications.",
+                ct).ConfigureAwait(false);
+            return;
+        }
+
+        long deliveredLast7Days;
+        await using (var count = new NpgsqlCommand(@"
+            SELECT count(*) FROM notification_deliveries
+            WHERE user_id = @u AND status = 'SENT' AND sent_at >= now() - interval '7 days'", conn))
+        {
+            count.Parameters.AddWithValue("@u", userId.Value);
+            deliveredLast7Days = (long)(await count.ExecuteScalarAsync(ct).ConfigureAwait(false))!;
+        }
+
+        var state = paused ? "PAUSED" : "active";
+        await _client.SendAsync(chatId.ToString(),
+            $"<b>TEOS status</b>\nLinked profile: <b>{Escape(displayName ?? "")}</b>\n" +
+            $"Notifications: {state}\nAlerts delivered (last 7 days): {deliveredLast7Days}",
+            ct).ConfigureAwait(false);
+    }
+
+    /// <summary>HTML-escapes user-supplied text before it appears in a bot message.</summary>
+    private static string Escape(string value) =>
+        value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
 
     /// <summary>Resolves the Telegram chat id for a user (throws when unregistered).</summary>
     public static Func<Guid, string> ChatResolver(string connectionString) => userId =>

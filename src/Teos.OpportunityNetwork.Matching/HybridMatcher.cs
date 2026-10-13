@@ -46,6 +46,8 @@ public sealed class HybridMatcher
         ArgumentNullException.ThrowIfNull(profile);
 
         double semantic;
+        decimal? payMin = null, payMax = null;
+        string? payCurrency = null;
         if (_evaluator is null)
         {
             semantic = MatchScoring.NeutralSemantic; // no LLM configured → neutral, never invented
@@ -55,9 +57,13 @@ public sealed class HybridMatcher
             var raw = await _evaluator.EvaluateAsync(Describe(opportunity), Describe(profile), ct).ConfigureAwait(false);
             var judgment = SemanticValidator.Validate(raw); // gate BEFORE scoring
             semantic = judgment.Relevance;
+            payMin = judgment.PayRangeMin;
+            payMax = judgment.PayRangeMax;
+            payCurrency = judgment.PayCurrency;
         }
 
-        var snapshot = SnapshotFactory.Capture(opportunity, profile, semantic, _config.WeightsVersion);
+        var snapshot = SnapshotFactory.Capture(opportunity, profile, semantic, _config.WeightsVersion,
+            payMin, payMax, payCurrency);
         return (Score(opportunity, profile, snapshot, semantic, confidence), snapshot);
     }
 
@@ -86,7 +92,9 @@ public static class SnapshotFactory
         Converters = { new JsonStringEnumConverter() }
     };
 
-    public static InputSnapshot Capture(Opportunity opportunity, UserProfile profile, double? semanticScore, string weightsVersion)
+    public static InputSnapshot Capture(
+        Opportunity opportunity, UserProfile profile, double? semanticScore, string weightsVersion,
+        decimal? payRangeMin = null, decimal? payRangeMax = null, string? payCurrency = null)
     {
         ArgumentNullException.ThrowIfNull(opportunity);
         ArgumentNullException.ThrowIfNull(profile);
@@ -99,6 +107,9 @@ public static class SnapshotFactory
             SnapshotSourceId = Guid.NewGuid(),
             WeightsVersion = weightsVersion,
             SemanticScore = semanticScore,
+            PayRangeMin = payRangeMin,
+            PayRangeMax = payRangeMax,
+            PayCurrency = payCurrency,
             CapturedAt = DateTimeOffset.UtcNow,
             Opportunity = opp,
             Profile = prof
@@ -167,6 +178,8 @@ internal static class MatchScoring
             $"urgency: {urgency:0.00}",
             $"semantic: {semantic:0.##}"
         };
+        if (snapshot.PayRangeMin is not null || snapshot.PayRangeMax is not null)
+            reasons.Add($"pay_range: {snapshot.PayRangeMin?.ToString() ?? "?"}-{snapshot.PayRangeMax?.ToString() ?? "?"} {snapshot.PayCurrency}".TrimEnd());
 
         return new MatchResult
         {
@@ -183,6 +196,9 @@ internal static class MatchScoring
             UrgencyScore = urgency,
             SemanticScore = semantic,
             Confidence = confidence,
+            PayRangeMin = snapshot.PayRangeMin,
+            PayRangeMax = snapshot.PayRangeMax,
+            PayCurrency = snapshot.PayCurrency,
             MatchedSkills = matched,
             MissingSkills = missing,
             Reasons = reasons.ToArray(),

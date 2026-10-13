@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Teos.OpportunityNetwork.Core.Domain;
 using Teos.OpportunityNetwork.Persistence;
 
 namespace Teos.OpportunityNetwork.Telegram;
@@ -28,7 +29,19 @@ public static class TelegramFormatter
         sb.AppendLine($"Type: {WebUtility.HtmlEncode(alert.OpportunityType)}");
 
         // Stored score, verbatim — the formatter never recomputes or re-derives it.
-        sb.AppendLine($"Match score: {alert.MatchScore:0.##} ({alert.Decision})");
+        // The decision is shown with the user-facing label (ALERT stays ALERT; LOG/IGNORE → SKIP).
+        var label = Enum.TryParse<MatchDecision>(alert.Decision, out var decision)
+            ? MatchDecisionRules.UserLabel(decision)
+            : alert.Decision;
+        sb.AppendLine($"Match score: {alert.MatchScore:0.##} ({label})");
+
+        if (alert.PayRangeMin is not null || alert.PayRangeMax is not null)
+        {
+            var pay = alert.PayRangeMin is not null && alert.PayRangeMax is not null && alert.PayRangeMin != alert.PayRangeMax
+                ? $"{alert.PayRangeMin:N0}–{alert.PayRangeMax:N0}"
+                : (alert.PayRangeMax ?? alert.PayRangeMin)?.ToString("N0");
+            sb.AppendLine($"Pay range (est.): {pay} {alert.PayCurrency}".TrimEnd());
+        }
 
         if (alert.MatchedSkills.Length > 0)
             sb.AppendLine($"Matched skills: {WebUtility.HtmlEncode(string.Join(", ", alert.MatchedSkills))}");

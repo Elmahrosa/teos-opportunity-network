@@ -130,7 +130,8 @@ Weights are configuration-driven, validated (must total `1.0`), and versioned. `
 The optional semantic signal can run on **several free OpenAI-compatible models at once** ("all free LLMs"), scored as a deterministic ensemble — no paid OpenAI key required.
 
 - **One adapter, many providers**: `ChatCompletionsSemanticEvaluator` talks to any `/chat/completions` endpoint. Free-tier defaults ship for `groq`, `openrouter`, `mistral`, `gemini`, `github` (GitHub Models) — all via `TEOS_LLM_PROVIDERS=groq,openrouter…` plus `{NAME}_API_KEY`. `ollama` is keyless and runs locally.
-- **Multi-agent fusion**: `EnsembleSemanticEvaluator` runs every configured provider in parallel, schema-validates each raw output, and fuses the valid judgments with a **deterministic median** (even counts use the mean of the two middle values). Provider order is normalized — identical inputs always give identical output. A canonical JSON carries the fused `relevance`, a per-provider rationale, and the union of `matched_keywords`.
+- **Multi-agent fusion**: `EnsembleSemanticEvaluator` runs every configured provider in parallel, schema-validates each raw output, and fuses the valid judgments with a **deterministic median** (even counts use the mean of the two middle values). Provider order is normalized — identical inputs always give identical output. A canonical JSON carries the fused `relevance`, an optional fused `pay_range` (median of the provider mins/maxes, currency by majority), a per-provider rationale, and the union of `matched_keywords`.
+- **Output contract**: each match persists a deterministic `match_score` (0–100) and decision — stored internally as `ALERT`/`LOG`/`IGNORE` (and `APPLY_NOW`/`REVIEW`/`PASS`), shown to users as **`ALERT`** / **`SKIP`** — plus the LLM-estimated `pay_range`. The **engine** owns the score and decision; the LLM only supplies the semantic signal and the pay-range estimate, frozen into the snapshot for replay.
 - **Resilient**: a failing provider is skipped, never fails the pipeline. If *every* provider fails, the documented **neutral-50** signal is returned with an explicit `all providers failed` rationale. No key configured at all → the matcher's neutral-50 fallback, unchanged.
 - **Replay stays honest**: the fused value is stored in the immutable `input_snapshot`; replay/benchmark reuses it verbatim and never re-calls any LLM (see `ForbiddenSemanticEvaluator`).
 - **Legacy**: a lone `OPENAI_API_KEY` still configures single-provider OpenAI (`single:openai`).
@@ -188,8 +189,9 @@ docker run -d --name teos-pg -p 54329:5432 \
   -e POSTGRES_USER=teos -e POSTGRES_PASSWORD=teos_dev -e POSTGRES_DB=teos \
   postgres:16
 
-# apply schema
+# apply schema (all up-migrations, in order — or just use `--migrate`)
 psql "$DATABASE_URL" -f migrations/0001_init.sql
+psql "$DATABASE_URL" -f migrations/0002_match_pay_range.sql
 # roll back
 psql "$DATABASE_URL" -f migrations/0001_init.down.sql
 ```
@@ -246,7 +248,8 @@ Collect (GitHub search) → Normalize → Deduplicate → Match (HYBRID_V1) → 
 | `--valuation` | Repo valuation CLI (existing behavior; `--repo-url`, `--output-json`, `--tier`, `--smoke`). Legacy alias `smoke` still works. |
 | `--once` | One full pipeline pass, then exit. Prints an ingested/matched/delivered report. |
 | `--loop [--interval SECS]` | Runs the pipeline on an interval (default `TEOS_LOOP_SECONDS`, 300 s) until Ctrl+C. |
-| `--migrate` | Idempotently applies `migrations/0001_init.sql` to `DATABASE_URL` (safe on every run). |
+| `--migrate` | Idempotently applies every `migrations/*.sql` (excluding `*.down.sql`) to `DATABASE_URL` (safe on every run). |
+| `--seed-profile FILE` | Idempotently upserts one user profile from a JSON file. Matching is skipped until at least one profile exists. |
 | `--help` | Usage. Unknown flags exit 1 with help. |
 
 ```bash

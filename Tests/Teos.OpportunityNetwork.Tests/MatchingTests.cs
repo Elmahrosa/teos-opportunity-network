@@ -256,4 +256,70 @@ public class MatchingTests
         Assert.InRange(result.MatchScore, 0, 100);
         Assert.False(double.IsNaN(result.MatchScore));
     }
+
+    // ---- LLM pay range (Stage 2) -------------------------------------------
+
+    private const string PayRangeJson =
+        "{\"relevance\": 88, \"rationale\": \"ok\", \"pay_range\": {\"min\": 193, \"max\": 442, \"currency\": \"USD\"}}";
+
+    [Fact]
+    public async Task Matcher_carries_llm_pay_range_into_result_and_snapshot()
+    {
+        var matcher = new HybridMatcher(ScoringConfig.CreateHybridV1(), new StaticSemanticEvaluator(PayRangeJson));
+
+        var (match, snapshot) = await matcher.MatchWithSnapshotAsync(NewOpportunity(), NewProfile(), 0.9);
+
+        Assert.Equal(193m, match.PayRangeMin);
+        Assert.Equal(442m, match.PayRangeMax);
+        Assert.Equal("USD", match.PayCurrency);
+        // Frozen into the snapshot as evidence (replay must never call an LLM again).
+        Assert.Equal(193m, snapshot.PayRangeMin);
+        Assert.Equal(442m, snapshot.PayRangeMax);
+        Assert.Equal("USD", snapshot.PayCurrency);
+    }
+
+    [Fact]
+    public async Task Replay_from_snapshot_reproduces_pay_range_without_llm()
+    {
+        var matcher = new HybridMatcher(ScoringConfig.CreateHybridV1(), new StaticSemanticEvaluator(PayRangeJson));
+        var (_, snapshot) = await matcher.MatchWithSnapshotAsync(NewOpportunity(), NewProfile(), 0.9);
+
+        // Replay: no evaluator configured; the range must come from the frozen snapshot.
+        var replayer = new HybridMatcher(ScoringConfig.CreateHybridV1());
+        var replayed = replayer.Score(snapshot.Opportunity, snapshot.Profile, snapshot, snapshot.SemanticScore ?? 50, 0.9);
+
+        Assert.Equal(193m, replayed.PayRangeMin);
+        Assert.Equal(442m, replayed.PayRangeMax);
+        Assert.Equal("USD", replayed.PayCurrency);
+    }
+
+    [Fact]
+    public async Task Matcher_without_pay_range_leaves_it_null()
+    {
+        var matcher = new HybridMatcher(ScoringConfig.CreateHybridV1(),
+            new StaticSemanticEvaluator("{\"relevance\": 70, \"rationale\": \"ok\"}"));
+
+        var (match, snapshot) = await matcher.MatchWithSnapshotAsync(NewOpportunity(), NewProfile());
+
+        Assert.Null(match.PayRangeMin);
+        Assert.Null(match.PayRangeMax);
+        Assert.Null(match.PayCurrency);
+        Assert.Null(snapshot.PayRangeMin);
+    }
+
+    // ---- user-facing decision label ----------------------------------------
+
+    [Fact]
+    public void User_label_keeps_alert_and_collapses_log_and_ignore_to_skip()
+    {
+        Assert.Equal("ALERT", MatchDecisionRules.UserLabel(MatchDecisionRules.Decide(95)));
+        Assert.Equal("ALERT", MatchDecisionRules.UserLabel(MatchDecisionRules.Decide(85)));
+        Assert.Equal("SKIP", MatchDecisionRules.UserLabel(MatchDecisionRules.Decide(84.99)));
+        Assert.Equal("SKIP", MatchDecisionRules.UserLabel(MatchDecisionRules.Decide(60)));
+        Assert.Equal("SKIP", MatchDecisionRules.UserLabel(MatchDecisionRules.Decide(0)));
+
+        Assert.Equal("ALERT", MatchDecisionRules.UserLabel(MatchDecision.ALERT));
+        Assert.Equal("SKIP", MatchDecisionRules.UserLabel(MatchDecision.LOG));
+        Assert.Equal("SKIP", MatchDecisionRules.UserLabel(MatchDecision.IGNORE));
+    }
 }

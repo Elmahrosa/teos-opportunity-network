@@ -18,6 +18,12 @@ public class SemanticEnsembleTests
         "{\"relevance\": " + relevance.ToString(System.Globalization.CultureInfo.InvariantCulture) +
         ", \"rationale\": \"r\", \"matched_keywords\": [\"" + string.Join("\", \"", keywords) + "\"]}";
 
+    private static string JRange(double relevance, decimal min, decimal max, string currency = "USD") =>
+        "{\"relevance\": " + relevance.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+        ", \"rationale\": \"r\", \"pay_range\": {\"min\": " +
+        min.ToString(System.Globalization.CultureInfo.InvariantCulture) + ", \"max\": " +
+        max.ToString(System.Globalization.CultureInfo.InvariantCulture) + ", \"currency\": \"" + currency + "\"}}";
+
     private static (double Relevance, string Rationale, string[] Keywords) Parse(string output)
     {
         using var doc = JsonDocument.Parse(output);
@@ -136,6 +142,47 @@ public class SemanticEnsembleTests
         var output = await ensemble.EvaluateAsync("o", "p");
         var judgment = SemanticValidator.Validate(output); // must not throw
         Assert.Equal(90, judgment.Relevance, 4);
+    }
+
+    [Fact]
+    public async Task Fuses_pay_range_median_across_providers()
+    {
+        var ensemble = new EnsembleSemanticEvaluator(new[]
+        {
+            P("alpha", JRange(40, 100, 200)),
+            P("beta", JRange(70, 300, 400)),
+            P("gamma", JRange(55, 500, 600))
+        });
+
+        var judgment = SemanticValidator.Validate(await ensemble.EvaluateAsync("o", "p"));
+
+        Assert.Equal(300m, judgment.PayRangeMin); // median of 100,300,500
+        Assert.Equal(400m, judgment.PayRangeMax); // median of 200,400,600
+        Assert.Equal("USD", judgment.PayCurrency);
+    }
+
+    [Fact]
+    public async Task Absent_pay_range_is_not_invented_by_the_ensemble()
+    {
+        var ensemble = new EnsembleSemanticEvaluator(new[] { P("alpha", J(70)), P("beta", J(80)) });
+        var judgment = SemanticValidator.Validate(await ensemble.EvaluateAsync("o", "p"));
+
+        Assert.Null(judgment.PayRangeMin);
+        Assert.Null(judgment.PayRangeMax);
+        Assert.Null(judgment.PayCurrency);
+    }
+
+    [Fact]
+    public async Task Pay_range_fusion_is_deterministic_across_runs()
+    {
+        var ensemble = new EnsembleSemanticEvaluator(new[]
+        {
+            P("beta", JRange(70, 300, 400)),
+            P("alpha", JRange(40, 100, 200))
+        });
+        var first = await ensemble.EvaluateAsync("o", "p");
+        var second = await ensemble.EvaluateAsync("o", "p");
+        Assert.Equal(first, second);
     }
 
     [Fact]

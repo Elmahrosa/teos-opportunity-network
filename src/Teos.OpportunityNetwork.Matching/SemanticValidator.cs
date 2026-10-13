@@ -14,6 +14,10 @@ public sealed class SemanticJudgment
     public double Relevance { get; init; }
     public string? Rationale { get; init; }
     public string[] MatchedKeywords { get; init; } = Array.Empty<string>();
+    /// <summary>Optional LLM-estimated pay range (USD or the model-declared currency).</summary>
+    public decimal? PayRangeMin { get; init; }
+    public decimal? PayRangeMax { get; init; }
+    public string? PayCurrency { get; init; }
 }
 
 /// <summary>
@@ -69,13 +73,57 @@ public static class SemanticValidator
                     .ToArray();
             }
 
+            var (payMin, payMax, payCurrency) = ReadPayRange(root);
+
             return new SemanticJudgment
             {
                 Relevance = value,
                 Rationale = rationale,
-                MatchedKeywords = keywords
+                MatchedKeywords = keywords,
+                PayRangeMin = payMin,
+                PayRangeMax = payMax,
+                PayCurrency = payCurrency
             };
         }
+    }
+
+    /// <summary>
+    /// Validates the OPTIONAL <c>pay_range</c> object: <c>{ "min": number?, "max": number?,
+    /// "currency": string? }</c>. Absent/null yields (null, null, null); present-but-malformed
+    /// (non-object, non-numeric bound, negative, min &gt; max) fails the gate like any other
+    /// schema violation. At least one numeric bound is required when <c>pay_range</c> is present.
+    /// </summary>
+    private static (decimal? Min, decimal? Max, string? Currency) ReadPayRange(JsonElement root)
+    {
+        if (!root.TryGetProperty("pay_range", out var range) || range.ValueKind == JsonValueKind.Null)
+            return (null, null, null);
+
+        if (range.ValueKind != JsonValueKind.Object)
+            throw new SemanticValidationException("'pay_range' must be an object with numeric 'min'/'max'");
+
+        var min = ReadOptionalDecimal(range, "min");
+        var max = ReadOptionalDecimal(range, "max");
+        if (min is null && max is null)
+            throw new SemanticValidationException("'pay_range' must include a numeric 'min' or 'max'");
+        if (min is < 0 || max is < 0)
+            throw new SemanticValidationException("'pay_range' bounds must be non-negative");
+        if (min is not null && max is not null && min > max)
+            throw new SemanticValidationException($"'pay_range' min {min} is greater than max {max}");
+
+        var currency = range.TryGetProperty("currency", out var c) && c.ValueKind == JsonValueKind.String
+            ? c.GetString()
+            : null;
+
+        return (min, max, currency);
+    }
+
+    private static decimal? ReadOptionalDecimal(JsonElement obj, string name)
+    {
+        if (!obj.TryGetProperty(name, out var el) || el.ValueKind == JsonValueKind.Null)
+            return null;
+        if (el.ValueKind != JsonValueKind.Number)
+            throw new SemanticValidationException($"'pay_range.{name}' must be a number");
+        return el.GetDecimal();
     }
 
     private static string StripCodeFence(string raw)

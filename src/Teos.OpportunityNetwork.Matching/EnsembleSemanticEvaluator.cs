@@ -16,7 +16,10 @@ public sealed record ProviderOutcome(
     ProviderOutcomeStatus Status,
     double? Relevance,
     string Detail,
-    string[] Keywords);
+    string[] Keywords,
+    decimal? PayRangeMin = null,
+    decimal? PayRangeMax = null,
+    string? PayCurrency = null);
 
 /// <summary>A named evaluator participating in the ensemble.</summary>
 public sealed record SemanticProvider(string Name, ISemanticEvaluator Evaluator);
@@ -61,7 +64,8 @@ public sealed class EnsembleSemanticEvaluator : ISemanticEvaluator
             {
                 var raw = await p.Evaluator.EvaluateAsync(opportunityText, profileText, ct).ConfigureAwait(false);
                 var judgment = SemanticValidator.Validate(raw); // schema gate per provider
-                return new ProviderOutcome(p.Name, ProviderOutcomeStatus.Success, judgment.Relevance, "ok", judgment.MatchedKeywords);
+                return new ProviderOutcome(p.Name, ProviderOutcomeStatus.Success, judgment.Relevance, "ok",
+                    judgment.MatchedKeywords, judgment.PayRangeMin, judgment.PayRangeMax, judgment.PayCurrency);
             }
             catch (SemanticValidationException)
             {
@@ -100,13 +104,59 @@ public sealed class EnsembleSemanticEvaluator : ISemanticEvaluator
                 ? $"{o.Provider}={o.Relevance!.Value:0.##}"
                 : $"{o.Provider}={o.Status.ToString().ToLowerInvariant()}"));
 
-        return JsonSerializer.Serialize(new
+        var (payMin, payMax, payCurrency) = FusePayRange();
+
+        // Dictionary preserves insertion order; the shape is deterministic for identical inputs.
+        var payload = new Dictionary<string, object?>
         {
-            relevance = Math.Round(fused, 4),
-            rationale,
-            matched_keywords = keywords
-        });
+            ["relevance"] = Math.Round(fused, 4),
+            ["rationale"] = rationale,
+            ["matched_keywords"] = keywords
+        };
+        if (payMin is not null || payMax is not null)
+            payload["pay_range"] = new PayRangeDto(payMin, payMax, payCurrency);
+
+        return JsonSerializer.Serialize(payload);
     }
+
+    /// <summary>
+    /// Deterministic pay-range fusion across successful providers: the median of the provided
+    /// mins and the median of the provided maxes (null when none provided); the currency is the
+    /// most common among contributors (ties broken by ordinal name). Never invents a range.
+    /// </summary>
+    private (decimal? Min, decimal? Max, string? Currency) FusePayRange()
+    {
+        var contributors = Outcomes
+            .Where(o => o.Status == ProviderOutcomeStatus.Success &&
+                        (o.PayRangeMin is not null || o.PayRangeMax is not null))
+            .ToArray();
+        if (contributors.Length == 0)
+            return (null, null, null);
+
+        var mins = contributors.Where(o => o.PayRangeMin is not null)
+            .Select(o => o.PayRangeMin!.Value).OrderBy(v => v).ToArray();
+        var maxs = contributors.Where(o => o.PayRangeMax is not null)
+            .Select(o => o.PayRangeMax!.Value).OrderBy(v => v).ToArray();
+
+        var currency = contributors
+            .Where(o => !string.IsNullOrWhiteSpace(o.PayCurrency))
+            .GroupBy(o => o.PayCurrency!, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(g => g.Count())
+            .ThenBy(g => g.Key, StringComparer.Ordinal)
+            .Select(g => g.First().PayCurrency)
+            .FirstOrDefault();
+
+        return (mins.Length > 0 ? MedianDecimal(mins) : null,
+                maxs.Length > 0 ? MedianDecimal(maxs) : null,
+                currency);
+    }
+
+    private static decimal MedianDecimal(decimal[] sortedAscending) =>
+        sortedAscending.Length % 2 == 1
+            ? sortedAscending[sortedAscending.Length / 2]
+            : (sortedAscending[sortedAscending.Length / 2 - 1] + sortedAscending[sortedAscending.Length / 2]) / 2m;
+
+    private sealed record PayRangeDto(decimal? min, decimal? max, string? currency);
 
     /// <summary>Deterministic median; even counts use the mean of the two middle values.</summary>
     internal static double Median(double[] sortedAscending) =>

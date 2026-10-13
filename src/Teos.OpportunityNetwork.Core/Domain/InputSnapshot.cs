@@ -19,6 +19,10 @@ public sealed class InputSnapshot
     public string WeightsVersion { get; set; } = ScoringConfig.HybridV1;
     /// <summary>Raw semantic relevance (0..100) used at scoring time; null when not evaluated.</summary>
     public double? SemanticScore { get; set; }
+    /// <summary>LLM-estimated pay range used at scoring time (null when omitted); replayed verbatim.</summary>
+    public decimal? PayRangeMin { get; set; }
+    public decimal? PayRangeMax { get; set; }
+    public string? PayCurrency { get; set; }
     public DateTimeOffset CapturedAt { get; set; } = DateTimeOffset.UtcNow;
     public Opportunity Opportunity { get; set; } = new();
     public UserProfile Profile { get; set; } = new();

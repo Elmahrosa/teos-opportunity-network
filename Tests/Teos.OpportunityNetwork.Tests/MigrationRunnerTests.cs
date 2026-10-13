@@ -1,3 +1,4 @@
+using Npgsql;
 using Teos.OpportunityNetwork.Runner;
 using Xunit;
 
@@ -35,5 +36,30 @@ public class MigrationRunnerTests
         Assert.All(CoreTables, table => Assert.Contains(table, first));
         Assert.All(CoreTables, table => Assert.Contains(table, second));
         Assert.Equal(first.Length, second.Length);
+    }
+
+    [Fact]
+    public async Task Migration_applies_every_up_script_and_adds_pay_range_columns()
+    {
+        // 0001 (create) + 0002 (pay range) must both be applied, in order.
+        var files = MigrationRunner.MigrationFiles();
+        Assert.Contains(files, f => Path.GetFileName(f) == "0001_init.sql");
+        Assert.Contains(files, f => Path.GetFileName(f) == "0002_match_pay_range.sql");
+        Assert.DoesNotContain(files, f => f.EndsWith(".down.sql", StringComparison.OrdinalIgnoreCase));
+
+        await MigrationRunner.MigrateAsync(_db.ConnectionString);
+
+        await using var conn = new NpgsqlConnection(_db.ConnectionString);
+        await conn.OpenAsync();
+        await using var cmd = new NpgsqlCommand(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'opportunity_matches'", conn);
+
+        var columns = new List<string>();
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) columns.Add(reader.GetString(0));
+
+        Assert.Contains("pay_range_min", columns);
+        Assert.Contains("pay_range_max", columns);
+        Assert.Contains("pay_currency", columns);
     }
 }

@@ -46,12 +46,14 @@ public sealed class MatchRepository
                 id, opportunity_id, user_id, match_score, decision, recommended_action,
                 skill_match, experience_match, budget_match, location_match, urgency_score,
                 semantic_score, confidence, matched_skills, missing_skills, reasons, warnings,
-                scoring_config, weights_version, engine_version, snapshot_source_id, created_at)
+                scoring_config, weights_version, engine_version, snapshot_source_id,
+                pay_range_min, pay_range_max, pay_currency, created_at)
             VALUES (
                 @id, @opportunity_id, @user_id, @match_score, @decision, @recommended_action,
                 @skill_match, @experience_match, @budget_match, @location_match, @urgency_score,
                 @semantic_score, @confidence, @matched_skills, @missing_skills, @reasons, @warnings,
-                @scoring_config, @weights_version, @engine_version, @snapshot_source_id, @created_at)
+                @scoring_config, @weights_version, @engine_version, @snapshot_source_id,
+                @pay_range_min, @pay_range_max, @pay_currency, @created_at)
             ON CONFLICT (opportunity_id, user_id, weights_version, engine_version) DO NOTHING",
             conn, tx);
 
@@ -115,7 +117,8 @@ public sealed class MatchRepository
             SELECT id, opportunity_id, user_id, match_score, decision, recommended_action,
                    skill_match, experience_match, budget_match, location_match, urgency_score,
                    semantic_score, confidence, matched_skills, missing_skills, reasons, warnings,
-                   scoring_config, weights_version, engine_version, snapshot_source_id, created_at
+                   scoring_config, weights_version, engine_version, snapshot_source_id,
+                   pay_range_min, pay_range_max, pay_currency, created_at
             FROM opportunity_matches
             WHERE opportunity_id = @o AND user_id = @u
               AND weights_version = @w AND engine_version = @e", conn);
@@ -143,7 +146,8 @@ public sealed class MatchRepository
                    m.matched_skills, m.missing_skills, m.reasons, m.semantic_score, m.confidence,
                    m.weights_version, m.engine_version, m.scoring_config, m.snapshot_source_id, m.created_at,
                    o.title, o.company, o.url, o.opportunity_type, o.budget_min, o.budget_max, o.currency,
-                   o.deadline, o.source, o.skills_required
+                   o.deadline, o.source, o.skills_required,
+                   m.pay_range_min, m.pay_range_max, m.pay_currency
             FROM opportunity_matches m
             JOIN opportunities o ON o.id = m.opportunity_id
             JOIN user_profiles p ON p.id = m.user_id
@@ -187,7 +191,10 @@ public sealed class MatchRepository
                 Currency = reader.IsDBNull(22) ? null : reader.GetString(22),
                 Deadline = reader.IsDBNull(23) ? null : reader.GetFieldValue<DateTimeOffset>(23),
                 Source = reader.GetString(24),
-                SkillsRequired = reader.GetFieldValue<string[]>(25)
+                SkillsRequired = reader.GetFieldValue<string[]>(25),
+                PayRangeMin = reader.IsDBNull(26) ? null : reader.GetDecimal(26),
+                PayRangeMax = reader.IsDBNull(27) ? null : reader.GetDecimal(27),
+                PayCurrency = reader.IsDBNull(28) ? null : reader.GetString(28)
             });
         }
         return list;
@@ -301,6 +308,9 @@ public sealed class MatchRepository
         cmd.Parameters.AddWithValue("@weights_version", m.WeightsVersion);
         cmd.Parameters.AddWithValue("@engine_version", m.EngineVersion);
         cmd.Parameters.AddWithValue("@snapshot_source_id", m.SnapshotSourceId);
+        cmd.Parameters.AddWithValue("@pay_range_min", (object?)m.PayRangeMin ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@pay_range_max", (object?)m.PayRangeMax ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@pay_currency", (object?)m.PayCurrency ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@created_at", m.CreatedAt);
     }
 
@@ -311,7 +321,8 @@ public sealed class MatchRepository
             SELECT id, opportunity_id, user_id, match_score, decision, recommended_action,
                    skill_match, experience_match, budget_match, location_match, urgency_score,
                    semantic_score, confidence, matched_skills, missing_skills, reasons, warnings,
-                   scoring_config, weights_version, engine_version, snapshot_source_id, created_at
+                   scoring_config, weights_version, engine_version, snapshot_source_id,
+                   pay_range_min, pay_range_max, pay_currency, created_at
             FROM opportunity_matches
             WHERE opportunity_id = @o AND user_id = @u
               AND weights_version = @w AND engine_version = @e", conn, tx);
@@ -351,7 +362,10 @@ public sealed class MatchRepository
             WeightsVersion = reader.GetString(18),
             EngineVersion = reader.GetString(19),
             SnapshotSourceId = reader.GetGuid(20),
-            CreatedAt = reader.GetFieldValue<DateTimeOffset>(21)
+            PayRangeMin = reader.IsDBNull(21) ? null : reader.GetDecimal(21),
+            PayRangeMax = reader.IsDBNull(22) ? null : reader.GetDecimal(22),
+            PayCurrency = reader.IsDBNull(23) ? null : reader.GetString(23),
+            CreatedAt = reader.GetFieldValue<DateTimeOffset>(24)
         };
     }
 
@@ -433,6 +447,10 @@ public sealed class PendingAlert
     public decimal? BudgetMin { get; set; }
     public decimal? BudgetMax { get; set; }
     public string? Currency { get; set; }
+    // LLM-estimated pay range persisted on the match (null when the model omitted it).
+    public decimal? PayRangeMin { get; set; }
+    public decimal? PayRangeMax { get; set; }
+    public string? PayCurrency { get; set; }
     public DateTimeOffset? Deadline { get; set; }
     public string Source { get; set; } = "";
     public string[] SkillsRequired { get; set; } = Array.Empty<string>();

@@ -51,7 +51,13 @@ public sealed class ChatCompletionsSemanticEvaluator : ISemanticEvaluator
                 {
                     role = "system",
                     content = "You judge how relevant an opportunity is to a candidate profile. " +
-                              "Respond with ONLY a JSON object: {\"relevance\": <number 0-100>, \"rationale\": <string>}."
+                              "Respond with ONLY a JSON object: " +
+                              "{\"relevance\": <number 0-100>, " +
+                              "\"pay_range\": {\"min\": <number>, \"max\": <number>, \"currency\": <string>}, " +
+                              "\"rationale\": <string>}. " +
+                              "pay_range is your best estimate of the realistic reward/compensation for this " +
+                              "opportunity in the stated currency; min must not exceed max. Omit pay_range entirely " +
+                              "when no reasonable estimate is possible."
                 },
                 new
                 {

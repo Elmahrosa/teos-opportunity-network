@@ -46,6 +46,14 @@ public static class MatchDecisionRules
         RecommendedAction.PASS;
 
     /// <summary>
+    /// User-facing decision label. The persisted vocabulary (ALERT/LOG/IGNORE) and its DB CHECK
+    /// constraints are unchanged; for display/notification the engine's ALERT stays ALERT while
+    /// LOG and IGNORE collapse to SKIP. Deterministic and derived from the stored decision only.
+    /// </summary>
+    public static string UserLabel(MatchDecision decision) =>
+        decision == MatchDecision.ALERT ? "ALERT" : "SKIP";
+
+    /// <summary>
     /// Validates the decision/action invariants. Hard invariants (score ≥ 90 must never be
     /// IGNORE / PASS) are checked first so their messages are stable, then full threshold
     /// consistency is enforced.

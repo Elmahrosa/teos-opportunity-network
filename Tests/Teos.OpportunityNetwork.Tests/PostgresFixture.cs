@@ -67,13 +67,13 @@ public sealed class PostgresFixture : IAsyncLifetime
     }
 
     /// <summary>
-    /// Resets the public schema and applies migrations/0001_init.sql. Called at the start of
-    /// each test seed so tests stay isolated even though the fixture (and its database) is
-    /// shared across the test collection.
+    /// Resets the public schema and applies every migrations/*.sql (excluding *.down.sql) in
+    /// lexical order. Called at the start of each test seed so tests stay isolated even though
+    /// the fixture (and its database) is shared across the test collection.
     /// </summary>
     public async Task ApplySchemaAsync()
     {
-        var sql = await File.ReadAllTextAsync(MigrationsPath());
+        var files = MigrationFiles();
         await using var conn = new NpgsqlConnection(ConnectionString);
         await conn.OpenAsync();
         await using (var reset = new NpgsqlCommand("DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;", conn))
@@ -81,20 +81,33 @@ public sealed class PostgresFixture : IAsyncLifetime
             await reset.ExecuteNonQueryAsync();
         }
 
-        await using var cmd = new NpgsqlCommand(sql, conn);
-        await cmd.ExecuteNonQueryAsync();
+        foreach (var file in files)
+        {
+            var sql = await File.ReadAllTextAsync(file);
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            await cmd.ExecuteNonQueryAsync();
+        }
     }
 
-    public static string MigrationsPath()
+    public static IReadOnlyList<string> MigrationFiles()
+    {
+        var dir = MigrationsDirectory();
+        return Directory.GetFiles(dir, "*.sql", SearchOption.TopDirectoryOnly)
+            .Where(f => !f.EndsWith(".down.sql", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    public static string MigrationsDirectory()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null)
         {
-            var candidate = Path.Combine(dir.FullName, "migrations", "0001_init.sql");
-            if (File.Exists(candidate)) return candidate;
+            var candidate = Path.Combine(dir.FullName, "migrations");
+            if (Directory.Exists(candidate)) return candidate;
             dir = dir.Parent!;
         }
-        throw new FileNotFoundException("migrations/0001_init.sql not found above " + AppContext.BaseDirectory);
+        throw new DirectoryNotFoundException("migrations/ not found above " + AppContext.BaseDirectory);
     }
 }
 

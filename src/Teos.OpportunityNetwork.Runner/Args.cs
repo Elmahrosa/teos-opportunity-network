@@ -17,8 +17,10 @@ public static class RunnerArgs
                                      ingest → normalize → dedup → match → persist → notify (Telegram).
           --loop [--interval SECS]   Run the notification pipeline on an interval until stopped
                                      (Ctrl+C). Interval overrides TEOS_LOOP_SECONDS (default 300).
-          --migrate                  Idempotently apply migrations/0001_init.sql to DATABASE_URL
-                                     (safe to run on every scan; CREATE TABLE IF NOT EXISTS).
+          --migrate                  Idempotently apply migrations/*.sql to DATABASE_URL
+                                     (safe to run on every scan; CREATE/ALTER ... IF NOT EXISTS).
+          --seed-profile FILE        Idempotently upsert one user profile from a JSON file
+                                     (enables matching; see user_profiles columns for the shape).
           --help                     Show this help.
 
         Environment (once/loop):
@@ -40,8 +42,10 @@ public static class RunnerArgs
     {
         var list = args ?? Array.Empty<string>();
         var first = list.FirstOrDefault()?.ToLowerInvariant();
+        // Match on the flag name only, so `--seed-profile=file.json` is accepted like other flags.
+        var flag = first?.Split('=', 2)[0];
 
-        switch (first)
+        switch (flag)
         {
             case null or "" or "--loop" or "loop":
                 return new RunnerMode(RunnerModeKind.Loop, LoopInterval: ParseInterval(list, fallback: null));
@@ -49,6 +53,11 @@ public static class RunnerArgs
                 return new RunnerMode(RunnerModeKind.Once, LoopInterval: ParseInterval(list, fallback: null));
             case "--migrate" or "migrate":
                 return new RunnerMode(RunnerModeKind.Migrate);
+            case "--seed-profile" or "seed-profile":
+                var path = ArgValue(list, "--seed-profile");
+                if (string.IsNullOrWhiteSpace(path))
+                    throw new UsageException("--seed-profile requires a JSON file path.");
+                return new RunnerMode(RunnerModeKind.SeedProfile, SeedProfilePath: path);
             case "--valuation" or "valuation":
                 return ValuationMode(list.Skip(1).ToArray());
             case "smoke" or "--smoke":
@@ -110,10 +119,15 @@ public enum RunnerModeKind
     Valuation,
     Once,
     Loop,
-    Migrate
+    Migrate,
+    SeedProfile
 }
 
-public sealed record RunnerMode(RunnerModeKind Kind, ValuationArgs? Valuation = null, TimeSpan? LoopInterval = null);
+public sealed record RunnerMode(
+    RunnerModeKind Kind,
+    ValuationArgs? Valuation = null,
+    TimeSpan? LoopInterval = null,
+    string? SeedProfilePath = null);
 
 public sealed record ValuationArgs(bool Smoke, string? RepoUrl = null, string? OutputJson = null, string? Tier = null)
 {

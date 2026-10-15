@@ -49,7 +49,8 @@ public class PersistenceTests
     }
 
     private static (MatchResult match, InputSnapshot snapshot) Build(
-        Guid oppId, Guid userId, ScoringConfig? config = null)
+        Guid oppId, Guid userId, ScoringConfig? config = null,
+        decimal? payMin = null, decimal? payMax = null, string? payCurrency = null)
     {
         config ??= ScoringConfig.CreateHybridV1();
         var opp = new Opportunity
@@ -67,9 +68,41 @@ public class PersistenceTests
             PreferredTypes = new[] { OpportunityType.BOUNTY, OpportunityType.PROJECT },
             BudgetMin = 100, BudgetMax = 5000, Currency = "USD", Keywords = new[] { "api" }
         };
-        var snapshot = SnapshotFactory.Capture(opp, profile, 80, config.WeightsVersion);
+        var snapshot = SnapshotFactory.Capture(opp, profile, 80, config.WeightsVersion, payMin, payMax, payCurrency);
         var matcher = new HybridMatcher(config);
         return (matcher.Score(opp, profile, snapshot, 80, 0.9), snapshot);
+    }
+
+    [Fact]
+    public async Task Pay_range_round_trips_through_the_database()
+    {
+        var (oppId, userId) = await SeedAsync();
+        var repo = new MatchRepository(_db.ConnectionString);
+        var (match, snapshot) = Build(oppId, userId, payMin: 193m, payMax: 442m, payCurrency: "USD");
+
+        await repo.SaveAsync(match, snapshot);
+
+        var loaded = await repo.FindSavedMatchAsync(oppId, userId, match.WeightsVersion, match.EngineVersion);
+        Assert.NotNull(loaded);
+        Assert.Equal(193m, loaded!.PayRangeMin);
+        Assert.Equal(442m, loaded.PayRangeMax);
+        Assert.Equal("USD", loaded.PayCurrency);
+    }
+
+    [Fact]
+    public async Task Absent_pay_range_round_trips_as_null()
+    {
+        var (oppId, userId) = await SeedAsync();
+        var repo = new MatchRepository(_db.ConnectionString);
+        var (match, snapshot) = Build(oppId, userId); // no pay range
+
+        await repo.SaveAsync(match, snapshot);
+
+        var loaded = await repo.FindSavedMatchAsync(oppId, userId, match.WeightsVersion, match.EngineVersion);
+        Assert.NotNull(loaded);
+        Assert.Null(loaded!.PayRangeMin);
+        Assert.Null(loaded.PayRangeMax);
+        Assert.Null(loaded.PayCurrency);
     }
 
     [Fact]

@@ -2,6 +2,8 @@
 
 **by Elmahrosa**
 
+[![TEOS Sovereign Repo Valuator](https://img.shields.io/badge/Action-TEOS%20Sovereign%20Repo%20Valuator-blue?logo=github)](https://github.com/Aymanseif/teos-repo-valuation)
+
 A deterministic opportunity scanner (`--once` / `--loop`) with a GitHub repo valuation action. Scores 0–100 with fixed thresholds (≥85 ALERT, ≥90 APPLY_NOW) and alerts via Telegram only when the bar is cleared. Matching is deterministic; an optional LLM semantic signal is capped at its configured weight and falls back to neutral-50 without an API key. Not a traditional job board.
 
 ```text
@@ -16,11 +18,13 @@ Discover opportunities
 
 ## Use the GitHub Action
 
-This repository ships a composite GitHub Action — **TEOS Sovereign Repo Valuation** (see [`action.yml`](action.yml)) — that scores a repository **0–100** and estimates a value range. Deterministic; no LLM.
+The **TEOS Sovereign Repo Valuator** action now lives in its own public repository:
+[`Aymanseif/teos-repo-valuation`](https://github.com/Aymanseif/teos-repo-valuation). It scores a
+repository **0–100** and estimates a value range. Deterministic; no LLM.
 
 ```yaml
 # .github/workflows/valuations.yml
-- uses: Elmahrosa/teos-opportunity-network@v1.1.1
+- uses: Aymanseif/teos-repo-valuation@v1.2.4
   with:
     github-token: ${{ github.token }}
 ```
@@ -121,6 +125,25 @@ Boundary tests in `tests/Teos.OpportunityNetwork.Tests/BoundaryTests.cs` enforce
 
 Weights are configuration-driven, validated (must total `1.0`), and versioned. `confidence` is metadata and never modifies `match_score`. Unknown budgets are valid and scored neutrally — never penalized.
 
+## Semantic scoring with free LLMs (multi-agent ensemble)
+
+The optional semantic signal can run on **several free OpenAI-compatible models at once** ("all free LLMs"), scored as a deterministic ensemble — no paid OpenAI key required.
+
+- **One adapter, many providers**: `ChatCompletionsSemanticEvaluator` talks to any `/chat/completions` endpoint. Free-tier defaults ship for `groq`, `openrouter`, `mistral`, `gemini`, `github` (GitHub Models) — all via `TEOS_LLM_PROVIDERS=groq,openrouter…` plus `{NAME}_API_KEY`. `ollama` is keyless and runs locally.
+- **Multi-agent fusion**: `EnsembleSemanticEvaluator` runs every configured provider in parallel, schema-validates each raw output, and fuses the valid judgments with a **deterministic median** (even counts use the mean of the two middle values). Provider order is normalized — identical inputs always give identical output. A canonical JSON carries the fused `relevance`, an optional fused `pay_range` (median of the provider mins/maxes, currency by majority), a per-provider rationale, and the union of `matched_keywords`.
+- **Output contract**: each match persists a deterministic `match_score` (0–100) and decision — stored internally as `ALERT`/`LOG`/`IGNORE` (and `APPLY_NOW`/`REVIEW`/`PASS`), shown to users as **`ALERT`** / **`SKIP`** — plus the LLM-estimated `pay_range`. The **engine** owns the score and decision; the LLM only supplies the semantic signal and the pay-range estimate, frozen into the snapshot for replay.
+- **Resilient**: a failing provider is skipped, never fails the pipeline. If *every* provider fails, the documented **neutral-50** signal is returned with an explicit `all providers failed` rationale. No key configured at all → the matcher's neutral-50 fallback, unchanged.
+- **Replay stays honest**: the fused value is stored in the immutable `input_snapshot`; replay/benchmark reuses it verbatim and never re-calls any LLM (see `ForbiddenSemanticEvaluator`).
+- **Legacy**: a lone `OPENAI_API_KEY` still configures single-provider OpenAI (`single:openai`).
+
+```bash
+# .env — run Groq + OpenRouter + a local Ollama as three scoring agents
+TEOS_LLM_PROVIDERS=groq,openrouter,ollama
+GROQ_API_KEY=gsk_...
+OPENROUTER_API_KEY=sk-or-...
+OLLAMA_BASE_URL=http://localhost:11434/v1
+```
+
 ## Step 9 — Telegram notification layer
 
 Telegram is a notification/UI layer only.
@@ -133,6 +156,16 @@ Telegram is a notification/UI layer only.
 - **Delivery guarantee**: at most one `SENT` row per `(match_id, user_id, channel)` enforced by a partial unique index plus an `already_alerted` double-check. Exactly-once cannot be guaranteed across a crash between provider accept and `mark_sent`; application-level idempotency is what is guaranteed.
 
 Bot commands (only what the profile model supports — implemented and tested): `/start`, `/pause`, `/resume`, `/help`, `/status`. `/status` reports the linked profile, notification state, and how many alerts were actually delivered (SENT) in the last 7 days.
+
+## Non-stop scheduled scanning (free)
+
+[`.github/workflows/scanner.yml`](.github/workflows/scanner.yml) runs the full pipeline **hourly** on GitHub-hosted runners — free for public repositories — plus on-demand via `workflow_dispatch`. (If the repository is private, scheduled runs count against the 2,000 free private Actions minutes/month; hourly is chosen to fit that budget at ~2 min/run. To restore 30-minute cadence, set `TEOS_SCAN_INTERVAL` lower **and** budget for paid minutes.)
+
+1. Provision a **persistent** PostgreSQL on a free tier ([Neon](https://neon.tech), [Supabase](https://supabase.com)) and set the repo secret `DATABASE_URL`. Ephemeral databases break dedup/evidence between runs. The workflow runs `--migrate` (idempotent schema bootstrap) before every scan, so a fresh database needs no manual SQL.
+2. Add secrets for the free LLM providers you want (`TEOS_LLM_PROVIDERS` + `{NAME}_API_KEY`), `TELEGRAM_BOT_TOKEN` for real alerts, and `TEOS_GITHUB_TOKEN` for collector rate limits.
+3. Each scheduled pass behaves exactly like a local `--once`: collect → normalize → dedup → match (ensemble semantic) → persist → notify. A pass failure never blocks the next run.
+
+Scheduled polling is near-continuous, not a literal daemon — for true 24/7 background operation, run `--loop` yourself on a server with Docker (`--loop --interval 600`).
 
 ## Monetization roadmap
 
@@ -156,8 +189,9 @@ docker run -d --name teos-pg -p 54329:5432 \
   -e POSTGRES_USER=teos -e POSTGRES_PASSWORD=teos_dev -e POSTGRES_DB=teos \
   postgres:16
 
-# apply schema
+# apply schema (all up-migrations, in order — or just use `--migrate`)
 psql "$DATABASE_URL" -f migrations/0001_init.sql
+psql "$DATABASE_URL" -f migrations/0002_match_pay_range.sql
 # roll back
 psql "$DATABASE_URL" -f migrations/0001_init.down.sql
 ```
@@ -173,7 +207,9 @@ See [.env.example](.env.example). Never commit real values.
 | `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather (required for real sends; runtime dry-runs without it) |
 | `TELEGRAM_CHAT_ID` | Fallback chat id for single-chat setups |
 | `GITHUB_TOKEN` | Optional; Bearer auth for the GitHub search API |
-| `OPENAI_API_KEY` | Optional; semantic evaluation (matcher falls back to neutral-50 without it) |
+| `OPENAI_API_KEY` | Optional; legacy single-provider semantic scoring |
+| `TEOS_LLM_PROVIDERS` | Optional; comma-separated free providers for ensemble semantic scoring (`groq`, `openrouter`, `mistral`, `gemini`, `github`, `ollama`) |
+| `{NAME}_BASE_URL` / `{NAME}_API_KEY` / `{NAME}_MODEL` | Per-provider OpenAI-compatible config; sane free-tier defaults exist for known providers; key optional for keyless local (Ollama) |
 | `DATABASE_URL` / `TEOS_TEST_DB` | Application / test database connection strings |
 | `TEOS_LOOP_SECONDS` | `--loop` interval in seconds (default 300) |
 | `TEOS_CONFIDENCE` | Confidence stored with each match result (default 0.9) |
@@ -212,6 +248,8 @@ Collect (GitHub search) → Normalize → Deduplicate → Match (HYBRID_V1) → 
 | `--valuation` | Repo valuation CLI (existing behavior; `--repo-url`, `--output-json`, `--tier`, `--smoke`). Legacy alias `smoke` still works. |
 | `--once` | One full pipeline pass, then exit. Prints an ingested/matched/delivered report. |
 | `--loop [--interval SECS]` | Runs the pipeline on an interval (default `TEOS_LOOP_SECONDS`, 300 s) until Ctrl+C. |
+| `--migrate` | Idempotently applies every `migrations/*.sql` (excluding `*.down.sql`) to `DATABASE_URL` (safe on every run). |
+| `--seed-profile FILE` | Idempotently upserts one user profile from a JSON file. Matching is skipped until at least one profile exists. |
 | `--help` | Usage. Unknown flags exit 1 with help. |
 
 ```bash
@@ -219,11 +257,16 @@ Collect (GitHub search) → Normalize → Deduplicate → Match (HYBRID_V1) → 
 docker run -d --name teos-pg -p 54329:5432 \
   -e POSTGRES_USER=teos -e POSTGRES_PASSWORD=teos_dev -e POSTGRES_DB=teos \
   postgres:16
-psql "Host=localhost;Port=54329;Username=teos;Password=teos_dev;Database=teos" -f migrations/0001_init.sql
 
+dotnet run --project src/Teos.OpportunityNetwork.Runner -- --migrate   # apply schema (idempotent)
 dotnet run --project src/Teos.OpportunityNetwork.Runner -- --once
 dotnet run --project src/Teos.OpportunityNetwork.Runner -- --loop --interval 600
 ```
+
+**Secrets safety (public repo):** the runner redacts `DATABASE_URL`, the Telegram token, and every
+`*_API_KEY` from logs and error messages before they reach stdout/stderr (`SecretRedactor`, incl.
+Npgsql `Password=` segments). The scheduled scanner's first step checks that required secrets are
+present and prints **set / not set only** — a value is never echoed into world-readable Actions logs.
 
 Live Telegram smoke (first real bot message):
 

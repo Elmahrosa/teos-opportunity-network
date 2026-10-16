@@ -21,6 +21,13 @@ public sealed class MatchResult
     public double UrgencyScore { get; set; }
     public double SemanticScore { get; set; }
     public double Confidence { get; set; }
+    /// <summary>
+    /// LLM-estimated pay range for the opportunity in <see cref="PayCurrency"/> (null when the
+    /// model omitted it). Carried on the immutable snapshot so replay reproduces it without an LLM.
+    /// </summary>
+    public decimal? PayRangeMin { get; set; }
+    public decimal? PayRangeMax { get; set; }
+    public string? PayCurrency { get; set; }
     public string[] MatchedSkills { get; set; } = Array.Empty<string>();
     public string[] MissingSkills { get; set; } = Array.Empty<string>();
     public string[] Reasons { get; set; } = Array.Empty<string>();

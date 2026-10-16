@@ -75,6 +75,28 @@ public class RunnerArgsTests
     }
 
     [Fact]
+    public void Parse_seed_profile()
+    {
+        var mode = RunnerArgs.Parse(new[] { "--seed-profile", "profile.json" });
+        Assert.Equal(RunnerModeKind.SeedProfile, mode.Kind);
+        Assert.Equal("profile.json", mode.SeedProfilePath);
+    }
+
+    [Fact]
+    public void Parse_seed_profile_equals_form()
+    {
+        var mode = RunnerArgs.Parse(new[] { "--seed-profile=profile.json" });
+        Assert.Equal(RunnerModeKind.SeedProfile, mode.Kind);
+        Assert.Equal("profile.json", mode.SeedProfilePath);
+    }
+
+    [Fact]
+    public void Seed_profile_without_path_throws_usage_exception()
+    {
+        Assert.Throws<RunnerArgs.UsageException>(() => RunnerArgs.Parse(new[] { "--seed-profile" }));
+    }
+
+    [Fact]
     public void Unknown_flag_throws_usage_exception()
     {
         Assert.Throws<RunnerArgs.UsageException>(() => RunnerArgs.Parse(new[] { "--bogus" }));

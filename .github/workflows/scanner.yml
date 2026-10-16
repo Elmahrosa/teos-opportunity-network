@@ -1,0 +1,120 @@
+name: Scanner (non-stop)
+
+# Near-continuous scanning for $0 on PUBLIC repositories: GitHub-hosted runners are free there.
+# Runs one full pipeline pass every hour; also runnable on demand from the Actions tab.
+#
+# NOTE: if this repository is made PRIVATE, scheduled runs count against the 2,000 free
+# private Actions minutes/month — the hourly cadence fits (~2 min/run × 720 ≈ 1,440 min/mo).
+# Going back to a 30-minute cadence would exceed the free private quota.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   DATABASE_URL          connection string to a PERSISTENT PostgreSQL (free tiers: Neon, Supabase).
+#                         It must survive between runs — dedup + evidence live there.
+#   TELEGRAM_BOT_TOKEN    your @BotFather token (optional: without it the pass dry-runs).
+#   TELEGRAM_CHAT_ID      chat id for the bot (env fallback; chat ids normally come from the DB).
+#   TEOS_GITHUB_TOKEN     optional GitHub token for the collector (higher API rate limits).
+#   TEOS_LLM_PROVIDERS    e.g. "groq,openrouter" (optional: without it, neutral-50 semantic).
+#   GROQ_API_KEY, OPENROUTER_API_KEY, GEMINI_API_KEY, MISTRAL_API_KEY, GITHUB_API_KEY
+#                         free keys for the providers you enable (empty/unset = provider skipped).
+#   <NAME>_MODEL          optional per-provider model override.
+#
+# NOTE: scans are scheduled, not a literal always-on daemon. For true 24/7 background
+# operation run `--loop` yourself (Docker/VPS) — see README "Run commands".
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize scanner runs so a manual dispatch can never overlap a scheduled run.
+concurrency:
+  group: scanner-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache NuGet + dotnet
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.nuget/packages
+            ~/.dotnet
+          key: scanner-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            scanner-${{ runner.os }}-
+
+      - name: Check required secrets (presence only — values are never printed)
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TEOS_GITHUB_TOKEN: ${{ secrets.TEOS_GITHUB_TOKEN }}
+          TEOS_LLM_PROVIDERS: ${{ secrets.TEOS_LLM_PROVIDERS }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          GITHUB_API_KEY: ${{ secrets.GITHUB_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          # Logs on this public repo are world-readable: never echo a secret VALUE, ever.
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::required secret DATABASE_URL is not set. Add it under Settings → Secrets and variables → Actions (persistent free Postgres, e.g. Neon/Supabase)."
+            exit 1
+          fi
+          for name in TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID TEOS_GITHUB_TOKEN TEOS_LLM_PROVIDERS GROQ_API_KEY OPENROUTER_API_KEY GEMINI_API_KEY MISTRAL_API_KEY GITHUB_API_KEY OPENAI_API_KEY; do
+            val="${!name}"
+            if [ -n "$val" ]; then echo "[secrets] $name: set"; else echo "[secrets] $name: (not set)"; fi
+          done
+
+      - name: Build Runner (Release)
+        shell: bash
+        run: dotnet build src/Teos.OpportunityNetwork.Runner/Teos.OpportunityNetwork.Runner.csproj -c Release --nologo
+
+      - name: Apply schema (idempotent --migrate)
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -n "$DATABASE_URL" ]; then
+            dotnet src/Teos.OpportunityNetwork.Runner/bin/Release/net8.0/Teos.OpportunityNetwork.Runner.dll --migrate
+          else
+            echo "::warning::DATABASE_URL not set — skipping --migrate"
+          fi
+
+      - name: Run opportunity scan (--once)
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TEOS_GITHUB_TOKEN: ${{ secrets.TEOS_GITHUB_TOKEN }}
+          # Free-LLM semantic ensemble — add/remove provider lines as you enable them.
+          TEOS_LLM_PROVIDERS: ${{ secrets.TEOS_LLM_PROVIDERS }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: ${{ secrets.GROQ_MODEL }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          MISTRAL_MODEL: ${{ secrets.MISTRAL_MODEL }}
+          GITHUB_API_KEY: ${{ secrets.GITHUB_API_KEY }}
+          GITHUB_MODEL: ${{ secrets.GITHUB_MODEL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+        run: |
+          dotnet src/Teos.OpportunityNetwork.Runner/bin/Release/net8.0/Teos.OpportunityNetwork.Runner.dll --once

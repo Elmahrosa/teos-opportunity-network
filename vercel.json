@@ -1,4 +1,4 @@
-{
+ {
   "version": 2,
   "builds": [
     {
@@ -7,6 +7,10 @@
     }
   ],
   "routes": [
+    {
+      "src": "/downloads/(.*)",
+      "dest": "/downloads/$1"
+    },
     {
       "src": "/(.*)",
       "dest": "/index.html"

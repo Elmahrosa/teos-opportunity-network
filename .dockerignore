@@ -1,0 +1,10 @@
+**/bin
+**/obj
+.git
+.github
+Tests
+.env
+*.user
+node_modules
+.next
+npm-debug.log*

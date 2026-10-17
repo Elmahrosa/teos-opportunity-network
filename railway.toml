@@ -1,0 +1,18 @@
+# Railway deployment for the TEOS Opportunity Network runner (always-on notifier).
+# The runner is a long-lived worker that scans on an interval and delivers Telegram alerts.
+# Provide secrets in the Railway dashboard (do not commit them):
+#   DATABASE_URL          Npgsql key=value form, e.g.
+#                         Host=...;Port=5432;Username=...;Password=...;Database=...;SSL Mode=Require
+#   TELEGRAM_BOT_TOKEN    from @BotFather
+#   TELEGRAM_CHAT_ID      default destination chat
+#   TEOS_LLM_PROVIDERS    e.g. groq
+#   GROQ_API_KEY          free key from console.groq.com
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "dotnet Teos.OpportunityNetwork.Runner.dll --loop --interval 3600"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
